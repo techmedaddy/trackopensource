@@ -102,19 +102,19 @@ async fn get_trending(State(state): State<AppState>) -> Json<Vec<RankedRepositor
         RankedRepository,
         r#"
         SELECT 
-            r.id, r.github_id, r.owner, r.name, r.description, r.language, r.categories, r.stars, r.forks,
+            r.id, r.github_id, r.owner, r.name, r.description, r.language, COALESCE(r.categories, '{}') as "categories!", r.stars, r.forks,
             30 as "timeframe_days!",
             0 as "stars_gained!",
-            0.0 as "star_velocity!",
-            0.0 as "growth_ratio!",
+            0.0::float8 as "star_velocity!",
+            0.0::float8 as "growth_ratio!",
             0 as "contributors_gained!",
-            0.0 as "contributor_growth!",
-            COALESCE(rk.velocity_score, 0.0) as "velocity_score!",
-            0.0 as "growth_score!",
-            0.0 as "contributor_score!",
-            COALESCE(rk.activity_score, 0.0) as "activity_score!",
-            0.0 as "maintenance_score!",
-            COALESCE(rk.trend_score, 0.0) as "trend_score!",
+            0.0::float8 as "contributor_growth!",
+            COALESCE(rk.velocity_score, 0.0::float8) as "velocity_score!",
+            0.0::float8 as "growth_score!",
+            0.0::float8 as "contributor_score!",
+            COALESCE(rk.activity_score, 0.0::float8) as "activity_score!",
+            0.0::float8 as "maintenance_score!",
+            COALESCE(rk.trend_score, 0.0::float8) as "trend_score!",
             COALESCE(rk.updated_at, r.updated_at) as "updated_at!"
         FROM repositories r
         LEFT JOIN rankings rk ON r.id = rk.repo_id
@@ -139,19 +139,19 @@ async fn search_repos(
         RankedRepository,
         r#"
         SELECT 
-            r.id, r.github_id, r.owner, r.name, r.description, r.language, r.categories, r.stars, r.forks,
+            r.id, r.github_id, r.owner, r.name, r.description, r.language, COALESCE(r.categories, '{}') as "categories!", r.stars, r.forks,
             30 as "timeframe_days!",
             0 as "stars_gained!",
-            0.0 as "star_velocity!",
-            0.0 as "growth_ratio!",
+            0.0::float8 as "star_velocity!",
+            0.0::float8 as "growth_ratio!",
             0 as "contributors_gained!",
-            0.0 as "contributor_growth!",
-            COALESCE(rk.velocity_score, 0.0) as "velocity_score!",
-            0.0 as "growth_score!",
-            0.0 as "contributor_score!",
-            COALESCE(rk.activity_score, 0.0) as "activity_score!",
-            0.0 as "maintenance_score!",
-            COALESCE(rk.trend_score, 0.0) as "trend_score!",
+            0.0::float8 as "contributor_growth!",
+            COALESCE(rk.velocity_score, 0.0::float8) as "velocity_score!",
+            0.0::float8 as "growth_score!",
+            0.0::float8 as "contributor_score!",
+            COALESCE(rk.activity_score, 0.0::float8) as "activity_score!",
+            0.0::float8 as "maintenance_score!",
+            COALESCE(rk.trend_score, 0.0::float8) as "trend_score!",
             COALESCE(rk.updated_at, r.updated_at) as "updated_at!"
         FROM repositories r
         LEFT JOIN rankings rk ON r.id = rk.repo_id

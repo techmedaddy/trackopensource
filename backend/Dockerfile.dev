@@ -10,4 +10,4 @@ RUN cargo install sqlx-cli --no-default-features --features rustls,postgres
 
 COPY . .
 
-CMD ["cargo", "watch", "-x", "run"]
+CMD sqlx database create && sqlx migrate run && cargo watch -x "run --bin backend"
