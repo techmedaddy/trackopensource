@@ -4,6 +4,14 @@ use serde::Serialize;
 use sqlx::PgPool;
 use std::collections::BTreeMap;
 use uuid::Uuid;
+use std::collections::HashMap;
+
+#[derive(Debug, Default)]
+struct SocialMetrics {
+    total_score: i64,
+    total_comments: i64,
+    total_mentions: i64,
+}
 
 const DEFAULT_WINDOWS: [i32; 3] = [7, 30, 90];
 
@@ -25,6 +33,7 @@ struct RawRanking {
     contributor_growth: f64,
     activity_raw: f64,
     maintenance_score: f64,
+    social_raw: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -67,9 +76,32 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
         grouped.entry(snapshot.repo_id).or_default().push(snapshot);
     }
 
+    let social_data = sqlx::query!(
+        r#"
+        SELECT repo_id, SUM(score) as total_score, SUM(comments_count) as total_comments, COUNT(id) as total_mentions
+        FROM social_mentions
+        WHERE published_at >= (NOW() - make_interval(days := $1))
+        GROUP BY repo_id
+        "#,
+        timeframe_days
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut social_map: HashMap<Uuid, SocialMetrics> = HashMap::new();
+    for row in social_data {
+        social_map.insert(row.repo_id, SocialMetrics {
+            total_score: row.total_score.unwrap_or(0),
+            total_comments: row.total_comments.unwrap_or(0),
+            total_mentions: row.total_mentions.unwrap_or(0),
+        });
+    }
+
     let raw_rankings: Vec<RawRanking> = grouped
-        .values()
-        .filter_map(|repo_snapshots| build_raw_ranking(repo_snapshots, timeframe_days))
+        .iter()
+        .filter_map(|(repo_id, repo_snapshots)| {
+            build_raw_ranking(repo_snapshots, timeframe_days, social_map.get(repo_id))
+        })
         .collect();
 
     let scored_rankings = score_rankings(raw_rankings);
@@ -82,7 +114,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
     Ok(scored_count)
 }
 
-fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32) -> Option<RawRanking> {
+fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32, social: Option<&SocialMetrics>) -> Option<RawRanking> {
     let latest = snapshots.last()?;
     let target = latest.captured_at - Duration::days(timeframe_days as i64);
     let baseline = snapshots
@@ -106,6 +138,11 @@ fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32) -> Option<RawR
     let contributor_growth = contributors_gained as f64 / baseline.contributors.max(1) as f64;
     let activity_raw = (forks_gained.max(0) + watchers_gained.max(0)) as f64 / elapsed_days;
 
+    let social_raw = match social {
+        Some(m) => (m.total_mentions as f64 * 5.0) + (m.total_score as f64 * 0.1) + (m.total_comments as f64 * 0.5),
+        None => 0.0,
+    };
+
     Some(RawRanking {
         repo_id: latest.repo_id,
         timeframe_days,
@@ -116,6 +153,7 @@ fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32) -> Option<RawR
         contributor_growth,
         activity_raw,
         maintenance_score: maintenance_score(latest),
+        social_raw,
     })
 }
 
@@ -125,6 +163,8 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
     let max_contributor = max_by(&raw_rankings, |ranking| ranking.contributor_growth);
     let max_activity = max_by(&raw_rankings, |ranking| ranking.activity_raw);
 
+    let max_social = max_by(&raw_rankings, |ranking| ranking.social_raw);
+
     raw_rankings
         .into_iter()
         .map(|raw| {
@@ -132,13 +172,14 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
             let growth_score = normalize(raw.growth_ratio, max_growth);
             let contributor_score = normalize(raw.contributor_growth, max_contributor);
             let activity_score = normalize(raw.activity_raw, max_activity);
-            let social_score = 0.0; // TODO: Implement social score based on social_mentions
-            let trend_score = (velocity_score * 0.40)
-                + (growth_score * 0.25)
+            let social_score = normalize(raw.social_raw, max_social);
+            
+            let trend_score = (velocity_score * 0.35)
+                + (growth_score * 0.20)
                 + (contributor_score * 0.20)
-                + (activity_score * 0.10)
-                + (raw.maintenance_score * 0.05)
-                + (social_score * 0.10); // Adding weight for social score
+                + (social_score * 0.15)
+                + (activity_score * 0.05)
+                + (raw.maintenance_score * 0.05);
 
             ScoredRanking {
                 raw,
