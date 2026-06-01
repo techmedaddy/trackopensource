@@ -38,7 +38,10 @@ pub async fn fetch_reddit_mentions(
     let query = format!("github.com/{}/{}", owner, name);
     let url = format!("https://www.reddit.com/search.json?q={}&sort=new&limit=50", query);
 
-    let resp = client.get(&url).send().await?;
+    let resp = client.get(&url)
+        .header(reqwest::header::USER_AGENT, "linux:opensource.radar:v1.0 (by /u/techmedaddy)")
+        .send()
+        .await?;
     
     if !resp.status().is_success() {
         tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, resp.status());

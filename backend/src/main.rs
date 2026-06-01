@@ -42,6 +42,7 @@ struct RankedRepository {
     activity_score: f64,
     maintenance_score: f64,
     trend_score: f64,
+    social_score: f64,
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -115,6 +116,7 @@ async fn get_trending(State(state): State<AppState>) -> Json<Vec<RankedRepositor
             COALESCE(rk.activity_score, 0.0::float8) as "activity_score!",
             0.0::float8 as "maintenance_score!",
             COALESCE(rk.trend_score, 0.0::float8) as "trend_score!",
+            COALESCE(rk.social_score, 0.0::float8) as "social_score!",
             COALESCE(rk.updated_at, r.updated_at) as "updated_at!"
         FROM repositories r
         LEFT JOIN rankings rk ON r.id = rk.repo_id
@@ -152,6 +154,7 @@ async fn search_repos(
             COALESCE(rk.activity_score, 0.0::float8) as "activity_score!",
             0.0::float8 as "maintenance_score!",
             COALESCE(rk.trend_score, 0.0::float8) as "trend_score!",
+            COALESCE(rk.social_score, 0.0::float8) as "social_score!",
             COALESCE(rk.updated_at, r.updated_at) as "updated_at!"
         FROM repositories r
         LEFT JOIN rankings rk ON r.id = rk.repo_id

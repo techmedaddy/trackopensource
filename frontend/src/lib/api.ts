@@ -20,6 +20,7 @@ export type RankedRepository = {
   activityScore: number;
   maintenanceScore: number;
   trendScore: number;
+  socialScore: number;
   updatedAt: string;
 };
 
@@ -63,6 +64,7 @@ export type Ranking = {
   activityScore: number;
   maintenanceScore: number;
   trendScore: number;
+  socialScore: number;
   updatedAt: string;
 };
 

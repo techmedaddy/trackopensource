@@ -148,9 +148,16 @@ function RepositoryTable({
           {repos.map((repo) => (
             <tr key={repo.id} className="transition hover:bg-green-50/40">
               <td className="px-5 py-4">
-                <Link href={`/repos/${repo.id}`} className="font-medium hover:text-green-700">
-                  {repoFullName(repo)}
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href={`/repos/${repo.id}`} className="font-medium hover:text-green-700">
+                    {repoFullName(repo)}
+                  </Link>
+                  {repo.socialScore > 20 && (
+                    <span className="inline-flex rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800" title="High Social Momentum">
+                      🔥 Trending
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 line-clamp-1 max-w-xl text-neutral-500">
                   {repo.description ?? "No description available."}
                 </p>
@@ -185,7 +192,14 @@ function VelocityRow({ repo }: { repo: RankedRepository }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-medium">{repoFullName(repo)}</div>
+          <div className="flex items-center gap-2">
+            <div className="font-medium">{repoFullName(repo)}</div>
+            {repo.socialScore > 20 && (
+              <span className="inline-flex rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800" title="High Social Momentum">
+                🔥 Trending
+              </span>
+            )}
+          </div>
           <div className="mt-1 text-sm text-neutral-500">{repo.language ?? "Unknown"}</div>
         </div>
         <div className="text-right">
@@ -210,7 +224,14 @@ function RisingCard({ repo }: { repo: RankedRepository }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-semibold">{repoFullName(repo)}</div>
+          <div className="flex items-center gap-2">
+            <div className="font-semibold">{repoFullName(repo)}</div>
+            {repo.socialScore > 20 && (
+              <span className="inline-flex rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800" title="High Social Momentum">
+                🔥 Trending
+              </span>
+            )}
+          </div>
           <p className="mt-2 line-clamp-3 text-sm leading-6 text-neutral-500">
             {repo.description ?? "No description available."}
           </p>
