@@ -4,6 +4,9 @@ WORKDIR /usr/src/app
 
 COPY . .
 
+# Force SQLx to use offline cached queries instead of needing a live database
+ENV SQLX_OFFLINE=true
+
 # Build the production binaries
 RUN cargo build --release --bin backend
 RUN cargo build --release --bin collector
