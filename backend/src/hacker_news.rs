@@ -7,7 +7,8 @@ use uuid::Uuid;
 
 #[derive(Deserialize, Debug)]
 struct AlgoliaHit {
-    objectID: String,
+    #[serde(rename = "objectID")]
+    object_id: String,
     title: Option<String>,
     url: Option<String>,
     points: Option<i32>,
@@ -42,7 +43,7 @@ pub async fn fetch_hn_mentions(
     let data: AlgoliaResponse = resp.json().await?;
 
     let mentions = data.hits.into_iter().filter_map(|hit| {
-        let external_id = hit.objectID.clone();
+        let external_id = hit.object_id.clone();
         let title = hit.title.unwrap_or_else(|| "No Title".to_string());
         let url = hit.url.unwrap_or_else(|| format!("https://news.ycombinator.com/item?id={}", external_id));
         
