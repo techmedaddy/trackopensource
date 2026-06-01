@@ -49,6 +49,7 @@ pub struct Ranking {
     pub activity_score: f64,
     pub maintenance_score: f64,
     pub trend_score: f64,
+    pub social_score: f64,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -76,7 +77,24 @@ pub struct RankedRepository {
     pub activity_score: f64,
     pub maintenance_score: f64,
     pub trend_score: f64,
+    pub social_score: f64,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct SocialMention {
+    pub id: Uuid,
+    pub repo_id: Uuid,
+    pub platform: String,
+    pub external_id: String,
+    pub title: String,
+    pub url: String,
+    pub score: i32,
+    pub comments_count: i32,
+    pub sentiment_score: Option<f64>,
+    pub published_at: DateTime<Utc>,
+    pub captured_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]

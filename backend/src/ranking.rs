@@ -35,6 +35,7 @@ struct ScoredRanking {
     contributor_score: f64,
     activity_score: f64,
     trend_score: f64,
+    social_score: f64,
 }
 
 pub async fn refresh_default_rankings(pool: &PgPool) -> Result<RankingRunSummary, sqlx::Error> {
@@ -131,11 +132,13 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
             let growth_score = normalize(raw.growth_ratio, max_growth);
             let contributor_score = normalize(raw.contributor_growth, max_contributor);
             let activity_score = normalize(raw.activity_raw, max_activity);
+            let social_score = 0.0; // TODO: Implement social score based on social_mentions
             let trend_score = (velocity_score * 0.40)
                 + (growth_score * 0.25)
                 + (contributor_score * 0.20)
                 + (activity_score * 0.10)
-                + (raw.maintenance_score * 0.05);
+                + (raw.maintenance_score * 0.05)
+                + (social_score * 0.10); // Adding weight for social score
 
             ScoredRanking {
                 raw,
@@ -144,6 +147,7 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
                 contributor_score,
                 activity_score,
                 trend_score,
+                social_score,
             }
         })
         .collect()
@@ -166,9 +170,10 @@ async fn upsert_ranking(pool: &PgPool, ranking: ScoredRanking) -> Result<(), sql
             activity_score,
             maintenance_score,
             trend_score,
+            social_score,
             updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
         ON CONFLICT (repo_id, timeframe_days)
         DO UPDATE SET
             stars_gained = EXCLUDED.stars_gained,
@@ -182,6 +187,7 @@ async fn upsert_ranking(pool: &PgPool, ranking: ScoredRanking) -> Result<(), sql
             activity_score = EXCLUDED.activity_score,
             maintenance_score = EXCLUDED.maintenance_score,
             trend_score = EXCLUDED.trend_score,
+            social_score = EXCLUDED.social_score,
             updated_at = CURRENT_TIMESTAMP
         "#,
     )
@@ -198,6 +204,7 @@ async fn upsert_ranking(pool: &PgPool, ranking: ScoredRanking) -> Result<(), sql
     .bind(ranking.activity_score)
     .bind(ranking.raw.maintenance_score)
     .bind(ranking.trend_score)
+    .bind(ranking.social_score)
     .execute(pool)
     .await?;
 

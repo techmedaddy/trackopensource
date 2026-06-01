@@ -1,4 +1,4 @@
-use backend::{categorize::categorize_repo, ranking};
+use backend::{categorize::categorize_repo, hacker_news, reddit, ranking};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, LINK, USER_AGENT};
 use serde::Deserialize;
 use sqlx::postgres::PgPoolOptions;
@@ -156,8 +156,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&pool)
         .await?;
 
-        // Delay to be polite to GitHub API
-        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+        // 3. Fetch and Insert Social Signals (Phase 2: Hacker News)
+        match hacker_news::fetch_hn_mentions(&client, repo_id, owner, name).await {
+            Ok(mentions) => {
+                if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
+                    tracing::error!("Failed to save HN mentions for {}/{}: {}", owner, name, e);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to fetch HN mentions for {}/{}: {}", owner, name, e);
+            }
+        }
+
+        match reddit::fetch_reddit_mentions(&client, repo_id, owner, name).await {
+            Ok(mentions) => {
+                if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
+                    tracing::error!("Failed to save Reddit mentions for {}/{}: {}", owner, name, e);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, e);
+            }
+        }
+
+        // Delay to be polite to GitHub and Algolia APIs
+        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     }
 
     let summary = ranking::refresh_default_rankings(&pool).await?;
