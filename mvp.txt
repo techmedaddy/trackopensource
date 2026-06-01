@@ -438,6 +438,20 @@ Hiring
 
 Map jobs to projects.
 
+## Phase 2: Social Signals & Hiring Intelligence
+
+**Goal**: Transform from a standard GitHub tracker into a true "momentum" radar.
+
+### 1. Social Data Integration (Completed)
+- [x] Integrate Hacker News API (Search for repository mentions in titles/comments).
+- [x] Integrate Reddit API (Search for repository mentions in relevant subreddits).
+- [x] Add `social_mentions` table (id, repo_id, platform, url, sentiment_score, created_at).
+- [x] Update ranking algorithm to heavily weight recent social mentions over static stars.
+
+### 2. CI/CD & Deployment (Completed)
+- [x] Migrate data collection cron jobs from GitHub Actions to Jenkins.
+- [x] Deploy the full stack (Frontend, Backend, Postgres) to an AWS EC2 instance.
+
 Phase 4
 
 Funding Intelligence.
