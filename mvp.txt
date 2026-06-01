@@ -134,7 +134,7 @@ Railway
 
 Cron:
 
-GitHub Actions
+Jenkins
 
 Monitoring:
 
