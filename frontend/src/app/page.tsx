@@ -10,9 +10,9 @@ import {
 
 export default async function Home() {
   const [trending, fastestGrowing, risingProjects] = await Promise.all([
-    getRankedRepositories("/trending"),
-    getRankedRepositories("/fastest-growing"),
-    getRankedRepositories("/rising"),
+    getRankedRepositories("/trending?limit=10&timeframeDays=30"),
+    getRankedRepositories("/fastest-growing?limit=8&timeframeDays=30"),
+    getRankedRepositories("/trending?limit=8&timeframeDays=30&maxStars=1000"),
   ]);
 
   const leader = trending[0];

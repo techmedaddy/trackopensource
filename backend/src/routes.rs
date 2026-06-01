@@ -157,6 +157,7 @@ pub async fn repo_detail(
             activity_score,
             maintenance_score,
             trend_score,
+            social_score,
             updated_at
         FROM rankings
         WHERE repo_id = $1 AND timeframe_days = $2
@@ -285,6 +286,7 @@ fn base_ranked_query() -> QueryBuilder<'static, Postgres> {
             rank.activity_score,
             rank.maintenance_score,
             rank.trend_score,
+            rank.social_score,
             rank.updated_at
         FROM repositories r
         JOIN rankings rank ON rank.repo_id = r.id
