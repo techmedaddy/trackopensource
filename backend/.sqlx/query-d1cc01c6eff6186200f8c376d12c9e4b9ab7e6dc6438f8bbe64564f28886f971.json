@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT repo_id, SUM(score) as total_score, SUM(comments_count) as total_comments, COUNT(id) as total_mentions\n        FROM social_mentions\n        WHERE published_at >= (NOW() - make_interval(days := $1))\n        GROUP BY repo_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "repo_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_score",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_comments",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_mentions",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "d1cc01c6eff6186200f8c376d12c9e4b9ab7e6dc6438f8bbe64564f28886f971"
+}
