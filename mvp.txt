@@ -1,0 +1,474 @@
+Open Source Radar
+Product Vision
+
+Most GitHub discovery is terrible.
+
+People find projects through:
+
+GitHub Trending
+Hacker News
+Reddit
+X/Twitter
+YouTube
+
+The problem is these are reactive.
+
+By the time a project appears everywhere, you're already late.
+
+Open Source Radar should answer:
+
+Which repositories are gaining momentum right now, why are they growing, and are they likely to become important?
+
+Think:
+
+Bloomberg Terminal for open source
+Crunchbase for repositories
+SimilarWeb for developer ecosystems
+Target Users
+Developers
+
+Looking for:
+
+Emerging technologies
+Interesting projects
+Career opportunities
+Founders
+
+Looking for:
+
+Infrastructure trends
+New developer tools
+Acquisition opportunities
+Engineering Managers
+
+Looking for:
+
+Technologies gaining adoption
+Hiring trends
+Investors
+
+Looking for:
+
+Open source commercial opportunities
+MVP
+
+Start with one promise:
+
+Discover repositories growing faster than expected.
+
+Nothing else.
+
+Core Architecture
+GitHub API
+     |
+     v
+Data Collector
+     |
+     v
+PostgreSQL
+     |
+     v
+Ranking Engine
+     |
+     v
+REST API
+     |
+     v
+Next.js Dashboard
+Tech Stack
+Backend
+
+Language:
+
+Rust
+
+Framework:
+
+Axum
+
+Async Runtime:
+
+Tokio
+
+Database:
+
+PostgreSQL
+
+Queries:
+
+SQLx
+
+Authentication:
+
+JWT
+
+API:
+
+REST initially
+Frontend
+
+Framework:
+
+Next.js
+
+UI:
+
+shadcn/ui
+
+Charts:
+
+Recharts
+
+Styling:
+
+Tailwind CSS
+Infrastructure
+
+Database:
+
+Neon
+
+Deployment:
+
+Railway
+
+Cron:
+
+GitHub Actions
+
+Monitoring:
+
+Grafana Cloud
+Database Design
+repositories
+id
+owner
+name
+description
+language
+stars
+forks
+created_at
+updated_at
+snapshots
+id
+repo_id
+stars
+forks
+watchers
+open_issues
+contributors
+captured_at
+
+This table becomes your time machine.
+
+rankings
+id
+repo_id
+velocity_score
+activity_score
+trend_score
+updated_at
+categories
+AI
+Database
+Infrastructure
+DevOps
+Frontend
+Backend
+Security
+Rust
+Go
+Python
+Data Collection
+Daily Snapshot Service
+
+Runs every 24 hours.
+
+Process:
+
+Fetch Repository
+     |
+Store Snapshot
+     |
+Calculate Deltas
+     |
+Update Rankings
+
+Example:
+
+Day 1
+
+Repo A
+Stars = 1000
+
+Day 30
+
+Repo A
+Stars = 5000
+
+Growth:
+
++4000 stars
+
+Store forever.
+
+Ranking Engine
+
+This is the product.
+
+Not the UI.
+
+Not the dashboard.
+
+Not AI.
+
+The ranking engine.
+
+Star Velocity
+
+Formula:
+
+stars gained / days
+
+Example:
+
++5000 stars
+30 days
+
+166/day
+Growth Ratio
+
+Formula:
+
+new_stars / existing_stars
+
+Example:
+
+5000 / 10000
+= 0.5
+
+50% growth.
+
+Contributor Growth
+
+Track:
+
+contributors_last_month
+contributors_now
+
+Example:
+
+20 -> 70
+
+Very strong signal.
+
+Maintenance Health
+
+Track:
+
+PR merge rate
+Issue response time
+Commit frequency
+
+Example:
+
+Healthy
+
+vs
+
+Abandoned
+Trend Score
+
+Example formula:
+
+40% star velocity
+30% contributor growth
+20% maintenance health
+10% issue activity
+
+Produces:
+
+Trend Score = 89
+Dashboard Pages
+Home
+
+Shows:
+
+Trending Repositories
+1. Repo A
+2. Repo B
+3. Repo C
+Fastest Growing
+Past 7 days
+Past 30 days
+Past 90 days
+New Rising Projects
+
+Filter:
+
+< 1000 stars
+
+Useful because this finds future winners.
+
+Repository Page
+
+Example:
+
+github.com/openhands/openhands
+
+Show:
+
+Growth Chart
+Stars over time
+Contributors
+Growth chart
+Activity
+Commits
+Issues
+PRs
+AI Summary
+Repository growth accelerated after launch
+of feature X.
+Search
+
+Users search:
+
+database
+
+Results:
+
+ClickHouse
+DuckDB
+SurrealDB
+
+Ranked by momentum.
+
+Not total stars.
+
+AI Features
+
+After MVP.
+
+Not before.
+
+Trend Explanation
+
+Input:
+
+Repository metrics
+
+Output:
+
+This repository gained 300%
+more contributors over the
+last 60 days.
+Similar Repository Discovery
+
+Input:
+
+vLLM
+
+Output:
+
+TensorRT-LLM
+SGLang
+llama.cpp
+Ecosystem Analysis
+
+Example:
+
+AI Agents
+
+Output:
+
+Top growing projects
+Funding activity
+Hiring demand
+Phase 2
+
+Add more signals.
+
+Hacker News
+
+Track:
+
+mentions
+comments
+upvotes
+
+Use:
+
+Hacker News API
+Reddit
+
+Track:
+
+mentions
+discussions
+sentiment
+
+Subreddits:
+
+r/programming
+r/rust
+r/selfhosted
+r/MachineLearning
+YouTube
+
+Track:
+
+project mentions
+tutorials
+Phase 3
+
+Hiring Intelligence.
+
+Collect:
+
+Company
+Skill
+Repository
+
+Example:
+
+Netflix
+Kubernetes
+Hiring
+
+Map jobs to projects.
+
+Phase 4
+
+Funding Intelligence.
+
+Track:
+
+company backing
+acquisitions
+sponsorships
+
+Examples:
+
+Databricks
+Confluent
+MongoDB
+What Makes It Interesting
+
+The real value is not:
+
+This repo has 50,000 stars.
+
+The value is:
+
+This repo is growing faster
+than 99% of repositories
+in its category.
+
+That requires:
+
+historical data
+ranking algorithms
+trend detection
+
+Those are substantially more interesting engineering problems than another CRUD SaaS, while still producing something that looks and feels like a polished product.
