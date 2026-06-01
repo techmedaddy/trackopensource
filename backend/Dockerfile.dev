@@ -1,0 +1,13 @@
+FROM rust:1.80
+
+WORKDIR /usr/src/app
+
+# Install cargo-watch for hot-reloading
+RUN cargo install cargo-watch
+
+# Install sqlx-cli for migrations
+RUN cargo install sqlx-cli --no-default-features --features rustls,postgres
+
+COPY . .
+
+CMD ["cargo", "watch", "-x", "run"]
