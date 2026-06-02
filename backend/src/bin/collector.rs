@@ -23,6 +23,17 @@ struct Owner {
     login: String,
 }
 
+#[derive(Deserialize, Debug)]
+struct GithubSearchResponse {
+    items: Vec<GithubSearchItem>,
+}
+
+#[derive(Deserialize, Debug)]
+struct GithubSearchItem {
+    owner: Owner,
+    name: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
@@ -62,33 +73,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .default_headers(headers)
         .build()?;
 
-    // Seed list of repositories to track for MVP
-    let seed_repos = vec![
-        ("torvalds", "linux"),
-        ("rust-lang", "rust"),
-        ("facebook", "react"),
-        ("vercel", "next.js"),
-        ("tokio-rs", "tokio"),
-        ("astral-sh", "ruff"),
-        ("astral-sh", "uv"),
-        ("openai", "openai-python"),
-        ("anthropics", "anthropic-sdk-python"),
-        ("vllm-project", "vllm"),
-        ("huggingface", "transformers"),
-        ("langchain-ai", "langchain"),
-        ("microsoft", "playwright"),
-        ("supabase", "supabase"),
-        ("neondatabase", "neon"),
-        ("denoland", "deno"),
-        ("oven-sh", "bun"),
-        ("grafana", "grafana"),
-        ("open-telemetry", "opentelemetry-collector"),
-        ("apache", "arrow"),
+    // Baseline Repositories (for comparison)
+    let mut repos_to_track: Vec<(String, String)> = vec![
+        ("torvalds".to_string(), "linux".to_string()),
+        ("rust-lang".to_string(), "rust".to_string()),
+        ("facebook".to_string(), "react".to_string()),
+        ("supabase".to_string(), "supabase".to_string()),
     ];
 
-    tracing::info!("Starting daily data collection for {} repositories", seed_repos.len());
+    // Discovery Phase: Find hidden gems & explosive new projects
+    // We search for repositories created in the last 60 days that have gained at least 30 stars.
+    match discover_rising_repos(&client).await {
+        Ok(new_repos) => {
+            repos_to_track.extend(new_repos);
+        }
+        Err(e) => {
+            tracing::error!("Failed to discover new repos: {}", e);
+        }
+    }
 
-    for (owner, name) in seed_repos {
+    // Remove duplicates just in case
+    repos_to_track.sort();
+    repos_to_track.dedup();
+
+    tracing::info!("Starting daily data collection for {} repositories", repos_to_track.len());
+
+    for (owner, name) in repos_to_track {
         tracing::info!("Fetching data for {}/{}", owner, name);
         let url = format!("https://api.github.com/repos/{}/{}", owner, name);
         
@@ -231,4 +241,37 @@ fn parse_last_page(link_header: &str) -> Option<i32> {
                 .collect();
             digits.parse().ok()
         })
+}
+
+async fn discover_rising_repos(client: &reqwest::Client) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
+    // Look for repositories created in the last 60 days that have gained at least 30 stars.
+    let cutoff_date = (chrono::Utc::now() - chrono::Duration::days(60)).format("%Y-%m-%d").to_string();
+    let query = format!("created:>{} stars:>30", cutoff_date);
+    
+    tracing::info!("Discovering new rising projects created after {}...", cutoff_date);
+    
+    let resp = client.get("https://api.github.com/search/repositories")
+        .query(&[
+            ("q", query.as_str()),
+            ("sort", "stars"),
+            ("order", "desc"),
+            ("per_page", "40"), // Fetch top 40 new trending projects
+        ])
+        .send()
+        .await?;
+        
+    if !resp.status().is_success() {
+        tracing::error!("Failed to search GitHub: {}", resp.status());
+        return Ok(vec![]);
+    }
+
+    let search_data: GithubSearchResponse = resp.json().await?;
+    
+    let mut discovered = Vec::new();
+    for item in search_data.items {
+        discovered.push((item.owner.login, item.name));
+    }
+    
+    tracing::info!("Found {} new rising projects!", discovered.len());
+    Ok(discovered)
 }
