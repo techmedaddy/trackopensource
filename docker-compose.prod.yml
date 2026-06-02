@@ -37,8 +37,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "80:3000"
+    # In production, we don't expose port 80 directly from next.js anymore. 
+    # Instead, caddy handles incoming ports 80 and 443 and proxies to this container internally.
+    expose:
+      - "3000"
     environment:
       - NEXT_PUBLIC_API_URL=/api
       - INTERNAL_API_URL=http://backend:8080/api
@@ -46,5 +48,20 @@ services:
       - backend
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

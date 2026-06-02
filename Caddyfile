@@ -1,0 +1,3 @@
+trackopensource.duckdns.org {
+    reverse_proxy frontend:3000
+}
