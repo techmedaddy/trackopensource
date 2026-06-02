@@ -32,12 +32,14 @@ export default async function Home(props: { searchParams: SearchParams }) {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
         <header className="flex flex-col gap-4 border-b border-neutral-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-green-700">
-              Momentum dashboard
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Open Source Radar
-            </h1>
+            <Link href="/" className="group block w-fit">
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-green-700 transition group-hover:text-green-600">
+                Momentum dashboard
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl transition group-hover:text-neutral-700">
+                Open Source Radar
+              </h1>
+            </Link>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">
               Discover repositories growing faster than expected, scored by star velocity,
               growth ratio, contributor movement, activity, and maintenance pressure.
