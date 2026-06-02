@@ -1,9 +1,10 @@
-use backend::{categorize::categorize_repo, hacker_news, reddit, ranking};
+use backend::{categorize::categorize_repo, hacker_news, reddit};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, LINK, USER_AGENT};
 use serde::Deserialize;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use uuid::Uuid;
+use futures::StreamExt;
 
 #[derive(Deserialize, Debug)]
 struct GithubRepo {
@@ -73,13 +74,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .default_headers(headers)
         .build()?;
 
-    // Baseline Repositories (for comparison)
-    let mut repos_to_track: Vec<(String, String)> = vec![
-        ("torvalds".to_string(), "linux".to_string()),
-        ("rust-lang".to_string(), "rust".to_string()),
-        ("facebook".to_string(), "react".to_string()),
-        ("supabase".to_string(), "supabase".to_string()),
-    ];
+    // 1. Fetch currently tracked repositories from Database (Single Source of Truth)
+    let mut repos_to_track: Vec<(String, String)> = Vec::new();
+    tracing::info!("Loading currently tracked repositories from database...");
+    
+    let existing_records = sqlx::query!("SELECT owner, name FROM repositories WHERE is_tracked = true")
+        .fetch_all(&pool)
+        .await?;
+
+    for row in existing_records {
+        repos_to_track.push((row.owner, row.name));
+    }
 
     // Discovery Phase: Find hidden gems & explosive new projects
     // We search for repositories created in the last 60 days that have gained at least 30 stars.
@@ -98,107 +103,135 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting daily data collection for {} repositories", repos_to_track.len());
 
-    for (owner, name) in repos_to_track {
-        tracing::info!("Fetching data for {}/{}", owner, name);
-        let url = format!("https://api.github.com/repos/{}/{}", owner, name);
-        
-        let resp = client.get(&url).send().await?;
-        
-        if resp.status() == reqwest::StatusCode::FORBIDDEN {
-            tracing::error!("Rate limit hit or forbidden access for {}/{}", owner, name);
-            break; // Stop execution if rate limited
-        } else if !resp.status().is_success() {
-            tracing::error!("Failed to fetch {}/{}: {}", owner, name, resp.status());
-            continue;
-        }
+    let stream = futures::stream::iter(repos_to_track)
+        .map(|(owner, name)| {
+            let client = client.clone();
+            let pool = pool.clone();
+            
+            async move {
+                tracing::info!("Fetching data for {}/{}", owner, name);
+                let url = format!("https://api.github.com/repos/{}/{}", owner, name);
+                
+                let resp = match client.get(&url).send().await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::error!("Request failed for {}/{}: {}", owner, name, e);
+                        return;
+                    }
+                };
+                
+                if resp.status() == reqwest::StatusCode::FORBIDDEN {
+                    tracing::error!("Rate limit hit or forbidden access for {}/{}", owner, name);
+                    return; // Note: with streams, we just skip this task rather than breaking the loop
+                } else if !resp.status().is_success() {
+                    tracing::error!("Failed to fetch {}/{}: {}", owner, name, resp.status());
+                    return;
+                }
 
-        let repo_data: GithubRepo = resp.json().await?;
-        let contributors = fetch_contributor_count(&client, &owner, &name).await.unwrap_or_else(|err| {
-            tracing::warn!("Could not fetch contributors for {}/{}: {}", owner, name, err);
-            0
-        });
-        let categories = categorize_repo(
-            repo_data.language.as_deref(),
-            &repo_data.name,
-            repo_data.description.as_deref(),
-        );
+                let repo_data = match resp.json::<GithubRepo>().await {
+                    Ok(data) => data,
+                    Err(e) => {
+                        tracing::error!("Failed to parse JSON for {}/{}: {}", owner, name, e);
+                        return;
+                    }
+                };
 
-        // 1. Upsert Repository Metadata
-        let repo_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO repositories (github_id, owner, name, description, language, categories, stars, forks)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (owner, name) 
-            DO UPDATE SET 
-                description = EXCLUDED.description,
-                language = EXCLUDED.language,
-                categories = EXCLUDED.categories,
-                stars = EXCLUDED.stars,
-                forks = EXCLUDED.forks,
-                updated_at = CURRENT_TIMESTAMP
-            RETURNING id
-            "#,
-        )
-        .bind(repo_data.id)
-        .bind(&repo_data.owner.login)
-        .bind(&repo_data.name)
-        .bind(&repo_data.description)
-        .bind(&repo_data.language)
-        .bind(&categories)
-        .bind(repo_data.stargazers_count)
-        .bind(repo_data.forks_count)
-        .fetch_one(&pool)
-        .await?;
+                let contributors = fetch_contributor_count(&client, &owner, &name).await.unwrap_or_else(|err| {
+                    tracing::warn!("Could not fetch contributors for {}/{}: {}", owner, name, err);
+                    0
+                });
+                let categories = categorize_repo(
+                    repo_data.language.as_deref(),
+                    &repo_data.name,
+                    repo_data.description.as_deref(),
+                );
 
-        // 2. Insert Time-Machine Snapshot
-        sqlx::query(
-            r#"
-            INSERT INTO snapshots (repo_id, stars, forks, watchers, open_issues, contributors)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
-        )
-        .bind(repo_id)
-        .bind(repo_data.stargazers_count)
-        .bind(repo_data.forks_count)
-        .bind(repo_data.subscribers_count)
-        .bind(repo_data.open_issues_count)
-        .bind(contributors)
-        .execute(&pool)
-        .await?;
+                // 1. Upsert Repository Metadata
+                let repo_id_result = sqlx::query_scalar::<_, Uuid>(
+                    r#"
+                    INSERT INTO repositories (github_id, owner, name, description, language, categories, stars, forks)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ON CONFLICT (owner, name) 
+                    DO UPDATE SET 
+                        description = EXCLUDED.description,
+                        language = EXCLUDED.language,
+                        categories = EXCLUDED.categories,
+                        stars = EXCLUDED.stars,
+                        forks = EXCLUDED.forks,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING id
+                    "#,
+                )
+                .bind(repo_data.id)
+                .bind(&repo_data.owner.login)
+                .bind(&repo_data.name)
+                .bind(&repo_data.description)
+                .bind(&repo_data.language)
+                .bind(&categories)
+                .bind(repo_data.stargazers_count)
+                .bind(repo_data.forks_count)
+                .fetch_one(&pool)
+                .await;
 
-        // 3. Fetch and Insert Social Signals (Phase 2: Hacker News)
-        match hacker_news::fetch_hn_mentions(&client, repo_id, &owner, &name).await {
-            Ok(mentions) => {
-                if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
-                    tracing::error!("Failed to save HN mentions for {}/{}: {}", owner, name, e);
+                let repo_id = match repo_id_result {
+                    Ok(id) => id,
+                    Err(e) => {
+                        tracing::error!("Failed to upsert {}/{}: {}", owner, name, e);
+                        return;
+                    }
+                };
+
+                // 2. Insert Time-Machine Snapshot (Idempotent!)
+                if let Err(e) = sqlx::query(
+                    r#"
+                    INSERT INTO snapshots (repo_id, stars, forks, watchers, open_issues, contributors, captured_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+                    ON CONFLICT (repo_id, ((captured_at AT TIME ZONE 'UTC')::DATE)) DO UPDATE SET
+                        stars = EXCLUDED.stars,
+                        forks = EXCLUDED.forks,
+                        watchers = EXCLUDED.watchers,
+                        open_issues = EXCLUDED.open_issues,
+                        contributors = EXCLUDED.contributors
+                    "#,
+                )
+                .bind(repo_id)
+                .bind(repo_data.stargazers_count)
+                .bind(repo_data.forks_count)
+                .bind(repo_data.subscribers_count)
+                .bind(repo_data.open_issues_count)
+                .bind(contributors)
+                .execute(&pool)
+                .await {
+                    tracing::error!("Failed to insert snapshot for {}/{}: {}", owner, name, e);
+                }
+
+                // 3. Fetch and Insert Social Signals (Phase 2: Hacker News)
+                match hacker_news::fetch_hn_mentions(&client, repo_id, &owner, &name).await {
+                    Ok(mentions) => {
+                        if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
+                            tracing::error!("Failed to save HN mentions for {}/{}: {}", owner, name, e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to fetch HN mentions for {}/{}: {}", owner, name, e);
+                    }
+                }
+
+                match reddit::fetch_reddit_mentions(&client, repo_id, &owner, &name).await {
+                    Ok(mentions) => {
+                        if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
+                            tracing::error!("Failed to save Reddit mentions for {}/{}: {}", owner, name, e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, e);
+                    }
                 }
             }
-            Err(e) => {
-                tracing::error!("Failed to fetch HN mentions for {}/{}: {}", owner, name, e);
-            }
-        }
+        })
+        .buffer_unordered(5);
 
-        match reddit::fetch_reddit_mentions(&client, repo_id, &owner, &name).await {
-            Ok(mentions) => {
-                if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
-                    tracing::error!("Failed to save Reddit mentions for {}/{}: {}", owner, name, e);
-                }
-            }
-            Err(e) => {
-                tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, e);
-            }
-        }
-
-        // Delay to be polite to GitHub and Algolia APIs
-        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-    }
-
-    let summary = ranking::refresh_default_rankings(&pool).await?;
-    tracing::info!(
-        "Ranking engine updated {} repositories across {:?} day windows",
-        summary.repositories_scored,
-        summary.timeframe_days
-    );
+    stream.collect::<Vec<()>>().await;
 
     tracing::info!("Data collection pipeline complete!");
     Ok(())

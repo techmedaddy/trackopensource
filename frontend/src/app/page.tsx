@@ -8,11 +8,17 @@ import {
   type RankedRepository,
 } from "@/lib/api";
 
-export default async function Home() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+export default async function Home(props: { searchParams: SearchParams }) {
+  const searchParams = await props.searchParams;
+  const windowStr = typeof searchParams.window === "string" ? searchParams.window : "30";
+  const timeframeDays = ["7", "30", "90"].includes(windowStr) ? windowStr : "30";
+
   const [trending, fastestGrowing, risingProjects] = await Promise.all([
-    getRankedRepositories("/trending?limit=10&timeframeDays=30"),
-    getRankedRepositories("/fastest-growing?limit=8&timeframeDays=30"),
-    getRankedRepositories("/trending?limit=8&timeframeDays=30&maxStars=1000"),
+    getRankedRepositories(`/trending?limit=10&timeframeDays=${timeframeDays}`),
+    getRankedRepositories(`/fastest-growing?limit=8&timeframeDays=${timeframeDays}`),
+    getRankedRepositories(`/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=1000`),
   ]);
 
   const leader = trending[0];
@@ -38,7 +44,7 @@ export default async function Home() {
           </div>
           <div className="grid grid-cols-3 gap-3 text-sm">
             <Metric label="Tracked" value={trackedCount || 0} />
-            <Metric label="Window" value="30d" />
+            <WindowSelector currentWindow={timeframeDays} />
             <Metric
               label="Leader"
               value={leader ? formatScore(leader.trendScore) : "0.0"}
@@ -100,6 +106,21 @@ function Metric({ label, value }: { label: string; value: string | number }) {
         {label}
       </div>
       <div className="mt-1 text-xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function WindowSelector({ currentWindow }: { currentWindow: string }) {
+  return (
+    <div className="min-w-24 rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm flex flex-col justify-center">
+      <div className="text-xs font-medium uppercase tracking-[0.14em] text-neutral-500 mb-1">
+        Window
+      </div>
+      <div className="flex items-center gap-3 text-sm font-medium text-neutral-400">
+        <Link href="?window=7" className={currentWindow === "7" ? "text-green-700 font-bold" : "hover:text-neutral-600"}>7d</Link>
+        <Link href="?window=30" className={currentWindow === "30" ? "text-green-700 font-bold" : "hover:text-neutral-600"}>30d</Link>
+        <Link href="?window=90" className={currentWindow === "90" ? "text-green-700 font-bold" : "hover:text-neutral-600"}>90d</Link>
+      </div>
     </div>
   );
 }

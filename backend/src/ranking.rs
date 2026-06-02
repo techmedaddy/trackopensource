@@ -5,6 +5,7 @@ use sqlx::PgPool;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 use std::collections::HashMap;
+use futures::StreamExt;
 
 #[derive(Debug, Default)]
 struct SocialMetrics {
@@ -61,20 +62,14 @@ pub async fn refresh_default_rankings(pool: &PgPool) -> Result<RankingRunSummary
 }
 
 pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usize, sqlx::Error> {
-    let snapshots = sqlx::query_as::<_, Snapshot>(
+    let mut snapshots_stream = sqlx::query_as::<_, Snapshot>(
         r#"
         SELECT id, repo_id, stars, forks, watchers, open_issues, contributors, captured_at
         FROM snapshots
         ORDER BY repo_id, captured_at
         "#,
     )
-    .fetch_all(pool)
-    .await?;
-
-    let mut grouped: BTreeMap<Uuid, Vec<Snapshot>> = BTreeMap::new();
-    for snapshot in snapshots {
-        grouped.entry(snapshot.repo_id).or_default().push(snapshot);
-    }
+    .fetch(pool);
 
     let social_data = sqlx::query!(
         r#"
@@ -97,12 +92,32 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
         });
     }
 
-    let raw_rankings: Vec<RawRanking> = grouped
-        .iter()
-        .filter_map(|(repo_id, repo_snapshots)| {
-            build_raw_ranking(repo_snapshots, timeframe_days, social_map.get(repo_id))
-        })
-        .collect();
+    let mut current_repo_id: Option<Uuid> = None;
+    let mut current_snapshots: Vec<Snapshot> = Vec::new();
+    let mut raw_rankings: Vec<RawRanking> = Vec::new();
+
+    while let Some(result) = snapshots_stream.next().await {
+        let snapshot = result?;
+        
+        if Some(snapshot.repo_id) != current_repo_id {
+            // Process the previous repository
+            if let Some(repo_id) = current_repo_id {
+                if let Some(ranking) = build_raw_ranking(&current_snapshots, timeframe_days, social_map.get(&repo_id)) {
+                    raw_rankings.push(ranking);
+                }
+            }
+            current_repo_id = Some(snapshot.repo_id);
+            current_snapshots.clear();
+        }
+        current_snapshots.push(snapshot);
+    }
+    
+    // Process the last repository in the stream
+    if let Some(repo_id) = current_repo_id {
+        if let Some(ranking) = build_raw_ranking(&current_snapshots, timeframe_days, social_map.get(&repo_id)) {
+            raw_rankings.push(ranking);
+        }
+    }
 
     let scored_rankings = score_rankings(raw_rankings);
     let scored_count = scored_rankings.len();
