@@ -10,6 +10,7 @@ ENV SQLX_OFFLINE=true
 # Build the production binaries
 RUN cargo build --release --bin backend
 RUN cargo build --release --bin collector
+RUN cargo build --release --bin ranker
 
 FROM debian:bookworm-slim
 
@@ -20,6 +21,7 @@ RUN apt-get update && apt-get install -y openssl libpq5 ca-certificates && rm -r
 
 COPY --from=builder /usr/src/app/target/release/backend /usr/local/bin/backend
 COPY --from=builder /usr/src/app/target/release/collector /usr/local/bin/collector
+COPY --from=builder /usr/src/app/target/release/ranker /usr/local/bin/ranker
 
 # Copy migrations so they can be run on startup if needed
 COPY --from=builder /usr/src/app/migrations ./migrations
