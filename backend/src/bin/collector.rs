@@ -205,7 +205,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::error!("Failed to insert snapshot for {}/{}: {}", owner, name, e);
                 }
 
-                // 3. Fetch and Insert Social Signals (Phase 2: Hacker News)
+                // 3. Fetch and Insert Job Demand (Phase 3)
+                match backend::jobs::discover_job_mentions(&client, repo_id, &name).await {
+                    Ok(mentions) => {
+                        if !mentions.is_empty() {
+                            tracing::info!("Found {} job mentions for {}/{}", mentions.len(), owner, name);
+                            if let Err(e) = backend::jobs::save_job_mentions(&pool, mentions).await {
+                                tracing::error!("Failed to save job mentions for {}/{}: {}", owner, name, e);
+                            }
+                        }
+                    }
+                    Err(e) => tracing::error!("Failed to fetch job mentions for {}/{}: {}", owner, name, e),
+                }
+
+                // 4. Fetch and Insert Social Signals (Phase 2: Hacker News & Reddit)
                 match hacker_news::fetch_hn_mentions(&client, repo_id, &owner, &name).await {
                     Ok(mentions) => {
                         if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {

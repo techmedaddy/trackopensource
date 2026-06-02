@@ -2,7 +2,6 @@ use crate::models::Snapshot;
 use chrono::Duration;
 use serde::Serialize;
 use sqlx::PgPool;
-use std::collections::BTreeMap;
 use uuid::Uuid;
 use std::collections::HashMap;
 use futures::StreamExt;
@@ -34,7 +33,9 @@ struct RawRanking {
     contributor_growth: f64,
     activity_raw: f64,
     maintenance_score: f64,
+    maintenance_score: f64,
     social_raw: f64,
+    hiring_raw: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -45,7 +46,9 @@ struct ScoredRanking {
     contributor_score: f64,
     activity_score: f64,
     trend_score: f64,
+    trend_score: f64,
     social_score: f64,
+    hiring_score: f64,
 }
 
 pub async fn refresh_default_rankings(pool: &PgPool) -> Result<RankingRunSummary, sqlx::Error> {
@@ -92,6 +95,23 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
         });
     }
 
+    let job_data = sqlx::query!(
+        r#"
+        SELECT repo_id, COUNT(id) as total_jobs
+        FROM job_mentions
+        WHERE posted_at >= (NOW() - make_interval(days := $1))
+        GROUP BY repo_id
+        "#,
+        timeframe_days
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut job_map: HashMap<Uuid, i64> = HashMap::new();
+    for row in job_data {
+        job_map.insert(row.repo_id, row.total_jobs.unwrap_or(0));
+    }
+
     let mut current_repo_id: Option<Uuid> = None;
     let mut current_snapshots: Vec<Snapshot> = Vec::new();
     let mut raw_rankings: Vec<RawRanking> = Vec::new();
@@ -102,7 +122,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
         if Some(snapshot.repo_id) != current_repo_id {
             // Process the previous repository
             if let Some(repo_id) = current_repo_id {
-                if let Some(ranking) = build_raw_ranking(&current_snapshots, timeframe_days, social_map.get(&repo_id)) {
+                if let Some(ranking) = build_raw_ranking(&current_snapshots, timeframe_days, social_map.get(&repo_id), job_map.get(&repo_id)) {
                     raw_rankings.push(ranking);
                 }
             }
@@ -114,7 +134,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
     
     // Process the last repository in the stream
     if let Some(repo_id) = current_repo_id {
-        if let Some(ranking) = build_raw_ranking(&current_snapshots, timeframe_days, social_map.get(&repo_id)) {
+        if let Some(ranking) = build_raw_ranking(&current_snapshots, timeframe_days, social_map.get(&repo_id), job_map.get(&repo_id)) {
             raw_rankings.push(ranking);
         }
     }
@@ -129,7 +149,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
     Ok(scored_count)
 }
 
-fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32, social: Option<&SocialMetrics>) -> Option<RawRanking> {
+fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32, social: Option<&SocialMetrics>, jobs: Option<&i64>) -> Option<RawRanking> {
     let latest = snapshots.last()?;
     let target = latest.captured_at - Duration::days(timeframe_days as i64);
     let baseline = snapshots
@@ -158,6 +178,8 @@ fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32, social: Option
         None => 0.0,
     };
 
+    let hiring_raw = *jobs.unwrap_or(&0) as f64;
+
     Some(RawRanking {
         repo_id: latest.repo_id,
         timeframe_days,
@@ -169,6 +191,7 @@ fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32, social: Option
         activity_raw,
         maintenance_score: maintenance_score(latest),
         social_raw,
+        hiring_raw,
     })
 }
 
@@ -179,6 +202,7 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
     let max_activity = max_by(&raw_rankings, |ranking| ranking.activity_raw);
 
     let max_social = max_by(&raw_rankings, |ranking| ranking.social_raw);
+    let max_hiring = max_by(&raw_rankings, |ranking| ranking.hiring_raw);
 
     raw_rankings
         .into_iter()
@@ -188,13 +212,14 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
             let contributor_score = normalize(raw.contributor_growth, max_contributor);
             let activity_score = normalize(raw.activity_raw, max_activity);
             let social_score = normalize(raw.social_raw, max_social);
+            let hiring_score = normalize(raw.hiring_raw, max_hiring);
             
-            let trend_score = (velocity_score * 0.35)
-                + (growth_score * 0.20)
-                + (contributor_score * 0.20)
+            let trend_score = (velocity_score * 0.30)
+                + (growth_score * 0.15)
+                + (contributor_score * 0.15)
+                + (hiring_score * 0.20)
                 + (social_score * 0.15)
-                + (activity_score * 0.05)
-                + (raw.maintenance_score * 0.05);
+                + (activity_score * 0.05);
 
             ScoredRanking {
                 raw,
@@ -204,6 +229,7 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
                 activity_score,
                 trend_score,
                 social_score,
+                hiring_score,
             }
         })
         .collect()
@@ -227,9 +253,10 @@ async fn upsert_ranking(pool: &PgPool, ranking: ScoredRanking) -> Result<(), sql
             maintenance_score,
             trend_score,
             social_score,
+            hiring_score,
             updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
         ON CONFLICT (repo_id, timeframe_days)
         DO UPDATE SET
             stars_gained = EXCLUDED.stars_gained,
@@ -244,6 +271,7 @@ async fn upsert_ranking(pool: &PgPool, ranking: ScoredRanking) -> Result<(), sql
             maintenance_score = EXCLUDED.maintenance_score,
             trend_score = EXCLUDED.trend_score,
             social_score = EXCLUDED.social_score,
+            hiring_score = EXCLUDED.hiring_score,
             updated_at = CURRENT_TIMESTAMP
         "#,
     )
@@ -261,6 +289,7 @@ async fn upsert_ranking(pool: &PgPool, ranking: ScoredRanking) -> Result<(), sql
     .bind(ranking.raw.maintenance_score)
     .bind(ranking.trend_score)
     .bind(ranking.social_score)
+    .bind(ranking.hiring_score)
     .execute(pool)
     .await?;
 
