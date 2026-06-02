@@ -1,5 +1,5 @@
 use axum::{
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -41,6 +41,7 @@ async fn main() {
         .route("/api/trending", get(routes::trending))
         .route("/api/fastest-growing", get(routes::fastest_growing))
         .route("/api/search", get(routes::search))
+        .route("/api/track", post(routes::track_repository))
         .route("/api/repos/:id", get(routes::repo_detail))
         .route("/api/facets", get(routes::facets))
         .layer(cors)

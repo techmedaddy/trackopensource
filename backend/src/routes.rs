@@ -39,6 +39,18 @@ pub struct RepoDetailQuery {
     pub timeframe_days: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackRequest {
+    pub github_id: i64,
+    pub owner: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub language: Option<String>,
+    pub stars: i32,
+    pub forks: i32,
+}
+
 enum SortMode {
     Trend,
     Fastest,
@@ -214,6 +226,35 @@ pub async fn facets(State(state): State<AppState>) -> AppResult<Json<Facets>> {
         categories,
         languages,
     }))
+}
+
+pub async fn track_repository(
+    State(state): State<AppState>,
+    Json(payload): Json<TrackRequest>,
+) -> AppResult<Json<serde_json::Value>> {
+    sqlx::query!(
+        r#"
+        INSERT INTO repositories (github_id, owner, name, description, language, stars, forks, is_tracked)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+        ON CONFLICT (github_id) DO UPDATE SET
+            is_tracked = true,
+            description = EXCLUDED.description,
+            language = EXCLUDED.language,
+            stars = EXCLUDED.stars,
+            forks = EXCLUDED.forks
+        "#,
+        payload.github_id,
+        payload.owner,
+        payload.name,
+        payload.description,
+        payload.language,
+        payload.stars,
+        payload.forks
+    )
+    .execute(&state.pool)
+    .await?;
+
+    Ok(Json(serde_json::json!({"status": "success", "message": "Repository is now being tracked"})))
 }
 
 async fn list_ranked_repositories(

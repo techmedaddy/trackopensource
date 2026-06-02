@@ -69,7 +69,14 @@ pub async fn discover_job_mentions(
                 let chunks: Vec<&str> = first_line.split('|').collect();
                 
                 let raw_company = chunks.first().unwrap_or(&"Unknown Company").trim().to_string();
-                let raw_title = chunks.get(1).map(|t| t.trim().to_string());
+                let raw_title = chunks.get(1).map(|t| {
+                    let mut s = t.trim().to_string();
+                    if s.len() > 255 {
+                        s.truncate(252);
+                        s.push_str("...");
+                    }
+                    s
+                });
                 
                 // Extremely basic HTML stripping just in case Algolia includes it
                 let clean_company = raw_company

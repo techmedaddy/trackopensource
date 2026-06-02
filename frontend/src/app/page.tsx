@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SearchPanel } from "@/components/search-panel";
+import { GithubSearchPanel } from "@/components/github-search";
 import {
   compactNumber,
   formatScore,
@@ -53,6 +54,7 @@ export default async function Home(props: { searchParams: SearchParams }) {
         </header>
 
         <SearchPanel initialResults={trending.slice(0, 6)} />
+        <GithubSearchPanel />
 
         <section className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
           <div className="rounded-lg border border-neutral-200 bg-white shadow-sm">
