@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let repo_data: GithubRepo = resp.json().await?;
-        let contributors = fetch_contributor_count(&client, owner, name).await.unwrap_or_else(|err| {
+        let contributors = fetch_contributor_count(&client, &owner, &name).await.unwrap_or_else(|err| {
             tracing::warn!("Could not fetch contributors for {}/{}: {}", owner, name, err);
             0
         });
@@ -167,7 +167,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
         // 3. Fetch and Insert Social Signals (Phase 2: Hacker News)
-        match hacker_news::fetch_hn_mentions(&client, repo_id, owner, name).await {
+        match hacker_news::fetch_hn_mentions(&client, repo_id, &owner, &name).await {
             Ok(mentions) => {
                 if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
                     tracing::error!("Failed to save HN mentions for {}/{}: {}", owner, name, e);
@@ -178,7 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        match reddit::fetch_reddit_mentions(&client, repo_id, owner, name).await {
+        match reddit::fetch_reddit_mentions(&client, repo_id, &owner, &name).await {
             Ok(mentions) => {
                 if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
                     tracing::error!("Failed to save Reddit mentions for {}/{}: {}", owner, name, e);
