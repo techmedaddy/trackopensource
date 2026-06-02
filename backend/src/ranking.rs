@@ -33,7 +33,6 @@ struct RawRanking {
     contributor_growth: f64,
     activity_raw: f64,
     maintenance_score: f64,
-    maintenance_score: f64,
     social_raw: f64,
     hiring_raw: f64,
 }
@@ -45,7 +44,6 @@ struct ScoredRanking {
     growth_score: f64,
     contributor_score: f64,
     activity_score: f64,
-    trend_score: f64,
     trend_score: f64,
     social_score: f64,
     hiring_score: f64,
