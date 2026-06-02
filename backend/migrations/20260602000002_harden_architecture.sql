@@ -1,5 +1,16 @@
 -- Point 2: Snapshot Idempotency
--- Ensure only one snapshot per repository per day (Must cast AT TIME ZONE 'UTC' to be IMMUTABLE)
+-- FIRST: Delete any existing duplicate snapshots from previous runs
+DELETE FROM snapshots
+WHERE id IN (
+    SELECT id
+    FROM (
+        SELECT id, ROW_NUMBER() OVER(PARTITION BY repo_id, (captured_at AT TIME ZONE 'UTC')::DATE ORDER BY captured_at DESC) as row_num
+        FROM snapshots
+    ) t
+    WHERE t.row_num > 1
+);
+
+-- THEN: Ensure only one snapshot per repository per day (Must cast AT TIME ZONE 'UTC' to be IMMUTABLE)
 CREATE UNIQUE INDEX unique_daily_snapshot ON snapshots(repo_id, ((captured_at AT TIME ZONE 'UTC')::DATE));
 
 -- Point 4: Search API Performance
