@@ -4,6 +4,8 @@ Open Source Radar is a tool to discover GitHub repositories that are growing fas
 
 While total star counts are easy to find, understanding growth rate, velocity, and real developer sentiment is much harder. This project periodically tracks repository metrics and combines them with social signals (like Hacker News mentions) to calculate a momentum score that bubbles up fast-moving projects early
 
+<img width="1024" height="1024" alt="track" src="https://github.com/user-attachments/assets/87d9e3ca-da00-4de9-a094-338a66123b65" />
+
 
 ## Tech Stack
 
