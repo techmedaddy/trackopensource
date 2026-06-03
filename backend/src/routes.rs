@@ -332,7 +332,38 @@ async fn list_ranked_repositories(
     query: RankingQuery,
     sort_mode: SortMode,
 ) -> Result<Vec<RankedRepository>, sqlx::Error> {
-    let timeframe_days = valid_timeframe(query.timeframe_days);
+    let mut current_timeframe = valid_timeframe(query.timeframe_days);
+
+    // 1. Try the requested timeframe
+    let mut repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe).await?;
+
+    // 2. Fallback to 30 days if 90 days is empty
+    if repos.is_empty() && current_timeframe == 90 {
+        current_timeframe = 30;
+        repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe).await?;
+    }
+
+    // 3. Fallback to 7 days if 30 days is empty
+    if repos.is_empty() && current_timeframe == 30 {
+        current_timeframe = 7;
+        repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe).await?;
+    }
+
+    // 4. Ultimate Fallback: If STILL empty, just return top repositories by raw stars
+    // This guarantees a new user ALWAYS sees data even if the ranking engine hasn't populated snapshots yet.
+    if repos.is_empty() {
+        repos = fetch_all_time_fallback(pool, &query).await?;
+    }
+
+    Ok(repos)
+}
+
+async fn fetch_with_timeframe(
+    pool: &PgPool,
+    query: &RankingQuery,
+    sort_mode: &SortMode,
+    timeframe_days: i32,
+) -> Result<Vec<RankedRepository>, sqlx::Error> {
     let limit = valid_limit(query.limit);
 
     let mut builder = base_ranked_query();
@@ -340,17 +371,17 @@ async fn list_ranked_repositories(
         .push(" WHERE rank.timeframe_days = ")
         .push_bind(timeframe_days);
 
-    if let Some(language) = query.language.filter(|value| !value.trim().is_empty()) {
+    if let Some(language) = query.language.as_ref().filter(|value| !value.trim().is_empty()) {
         builder
             .push(" AND LOWER(COALESCE(r.language, '')) = LOWER(")
-            .push_bind(language)
+            .push_bind(language.clone())
             .push(")");
     }
 
-    if let Some(category) = query.category.filter(|value| !value.trim().is_empty()) {
+    if let Some(category) = query.category.as_ref().filter(|value| !value.trim().is_empty()) {
         builder
             .push(" AND EXISTS (SELECT 1 FROM unnest(r.categories) category WHERE LOWER(category) = LOWER(")
-            .push_bind(category)
+            .push_bind(category.clone())
             .push("))");
     }
 
@@ -368,6 +399,69 @@ async fn list_ranked_repositories(
     }
 
     builder.push(" LIMIT ").push_bind(limit);
+
+    builder.build_query_as::<RankedRepository>().fetch_all(pool).await
+}
+
+async fn fetch_all_time_fallback(
+    pool: &PgPool,
+    query: &RankingQuery,
+) -> Result<Vec<RankedRepository>, sqlx::Error> {
+    let limit = valid_limit(query.limit);
+    
+    // We construct a mock "RankedRepository" directly from the "repositories" table,
+    // filling the ranking fields with zeroes, but using `stars` as the `trend_score`
+    // so they still sort correctly on the frontend.
+    let mut builder = QueryBuilder::new(
+        r#"
+        SELECT
+            r.id,
+            r.github_id,
+            r.owner,
+            r.name,
+            r.description,
+            r.language,
+            r.categories,
+            r.stars,
+            r.forks,
+            30 as timeframe_days,
+            0 as stars_gained,
+            0.0 as star_velocity,
+            0.0 as growth_ratio,
+            0 as contributors_gained,
+            0.0 as contributor_growth,
+            0.0 as velocity_score,
+            0.0 as growth_score,
+            0.0 as contributor_score,
+            0.0 as activity_score,
+            0.0 as maintenance_score,
+            (r.stars::FLOAT) as trend_score,
+            0.0 as social_score,
+            r.updated_at
+        FROM repositories r
+        WHERE r.stars >= 0
+        "#
+    );
+
+    if let Some(language) = query.language.as_ref().filter(|value| !value.trim().is_empty()) {
+        builder
+            .push(" AND LOWER(COALESCE(r.language, '')) = LOWER(")
+            .push_bind(language.clone())
+            .push(")");
+    }
+
+    if let Some(category) = query.category.as_ref().filter(|value| !value.trim().is_empty()) {
+        builder
+            .push(" AND EXISTS (SELECT 1 FROM unnest(r.categories) category WHERE LOWER(category) = LOWER(")
+            .push_bind(category.clone())
+            .push("))");
+    }
+
+    if let Some(max_stars) = query.max_stars {
+        builder.push(" AND r.stars <= ").push_bind(max_stars);
+    }
+
+    builder.push(" ORDER BY r.stars DESC LIMIT ").push_bind(limit);
 
     builder.build_query_as::<RankedRepository>().fetch_all(pool).await
 }
