@@ -6,6 +6,7 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 
+use std::sync::{Arc, Mutex};
 use backend::routes::{self, AppState};
 
 #[tokio::main]
@@ -29,7 +30,10 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
-    let state = AppState { pool };
+    let state = AppState { 
+        pool,
+        manual_triggers: Arc::new(Mutex::new(Vec::new())),
+    };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -43,6 +47,7 @@ async fn main() {
         .route("/api/search", get(routes::search))
         .route("/api/track", post(routes::track_repository))
         .route("/api/repos/:id", get(routes::repo_detail))
+        .route("/api/trigger", post(routes::trigger_scan))
         .route("/api/facets", get(routes::facets))
         .layer(cors)
         .with_state(state);

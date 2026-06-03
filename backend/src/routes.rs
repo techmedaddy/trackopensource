@@ -10,9 +10,13 @@ use serde::Deserialize;
 use sqlx::{PgPool, Postgres, QueryBuilder};
 use uuid::Uuid;
 
+use std::time::Instant;
+use std::sync::{Arc, Mutex};
+
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    pub manual_triggers: Arc<Mutex<Vec<Instant>>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -255,6 +259,72 @@ pub async fn track_repository(
     .await?;
 
     Ok(Json(serde_json::json!({"status": "success", "message": "Repository is now being tracked"})))
+}
+
+pub async fn trigger_scan(
+    State(state): State<AppState>,
+) -> AppResult<Json<serde_json::Value>> {
+    let now = Instant::now();
+    let one_hour = std::time::Duration::from_secs(3600);
+    
+    {
+        let mut triggers = state.manual_triggers.lock().unwrap();
+        // Remove triggers older than 1 hour
+        triggers.retain(|&t| now.duration_since(t) < one_hour);
+        
+        if triggers.len() >= 3 {
+            return Err(crate::error::AppError::RateLimit("Maximum of 3 manual scans per hour allowed. Please try again later.".into()));
+        }
+        
+        triggers.push(now);
+    }
+
+    // Spawn a background task to run the binaries
+    tokio::spawn(async {
+        tracing::info!("Manual scan triggered. Starting collector...");
+        
+        // Execute collector
+        let collector_status = tokio::process::Command::new("cargo")
+            .arg("run")
+            .arg("--bin")
+            .arg("collector")
+            .status()
+            .await;
+            
+        // Note: In a production docker container without `cargo`, it would just be `Command::new("collector")`.
+        // For dual-compatibility locally and in production (if production paths are setup), we try `collector` if cargo fails.
+        let collector_success = match collector_status {
+            Ok(status) if status.success() => true,
+            _ => {
+                // Try production path directly
+                if let Ok(status) = tokio::process::Command::new("collector").status().await {
+                    status.success()
+                } else {
+                    false
+                }
+            }
+        };
+
+        if collector_success {
+            tracing::info!("Collector finished successfully. Starting ranker...");
+            let ranker_status = tokio::process::Command::new("cargo")
+                .arg("run")
+                .arg("--bin")
+                .arg("ranker")
+                .status()
+                .await;
+            if ranker_status.is_err() {
+                let _ = tokio::process::Command::new("ranker").status().await;
+            }
+        } else {
+            tracing::error!("Collector failed to run.");
+        }
+    });
+
+    Ok(Json(serde_json::json!({
+        "status": "success", 
+        "message": "Scan triggered and is running in the background!"
+    })))
 }
 
 async fn list_ranked_repositories(

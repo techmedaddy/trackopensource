@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SearchPanel } from "@/components/search-panel";
 import { GithubSearchPanel } from "@/components/github-search";
+import { ScanTrigger } from "@/components/scan-trigger";
 import {
   compactNumber,
   formatScore,
@@ -45,13 +46,14 @@ export default async function Home(props: { searchParams: SearchParams }) {
               growth ratio, contributor movement, activity, and maintenance pressure.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-4 gap-3 text-sm">
             <Metric label="Tracked" value={trackedCount || 0} />
             <WindowSelector currentWindow={timeframeDays} />
             <Metric
               label="Leader"
               value={leader ? formatScore(leader.trendScore) : "0.0"}
             />
+            <ScanTrigger />
           </div>
         </header>
 

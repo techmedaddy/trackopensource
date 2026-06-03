@@ -9,6 +9,8 @@ use serde::Serialize;
 pub enum AppError {
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
+    #[error("{0}")]
+    RateLimit(String),
 }
 
 #[derive(Serialize)]
@@ -20,6 +22,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = match self {
             AppError::Database(sqlx::Error::RowNotFound) => StatusCode::NOT_FOUND,
+            AppError::RateLimit(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 

@@ -23,6 +23,8 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "8080:8080"
+    env_file:
+      - ./backend/.env
     volumes:
       - ./backend:/usr/src/app
       - cargo_cache:/usr/local/cargo/registry
