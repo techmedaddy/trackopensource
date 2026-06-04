@@ -4,7 +4,7 @@ Open Source Radar is a sophisticated analytics platform that discovers GitHub re
 
 While total star counts are easy to find, understanding growth rate, velocity, and real developer sentiment is much harder. This project periodically tracks repository metrics and combines them with social signals (like Hacker News job mentions and Reddit discussions) to calculate a blended momentum score that bubbles up fast-moving projects early.
 
-<img width="512" height="512" alt="track" src="https://github.com/user-attachments/assets/87d9e3ca-da00-4de9-a094-338a66123b65" />
+<img width="1024" height="1024" alt="track" src="https://github.com/user-attachments/assets/87d9e3ca-da00-4de9-a094-338a66123b65" />
 
 ## Features
 
