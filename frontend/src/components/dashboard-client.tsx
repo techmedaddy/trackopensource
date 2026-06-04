@@ -1,5 +1,6 @@
 "use client";
 
+import { SignInButton, Show, UserButton } from "@clerk/nextjs";
 import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -13,7 +14,12 @@ import {
   type RankedRepository,
 } from "@/lib/api";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+};
 
 interface DashboardClientProps {
   initialTrending: RankedRepository[];
@@ -65,7 +71,7 @@ export function DashboardClient({
               Momentum dashboard
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl transition group-hover:text-neutral-700">
-              Open Source Radar
+              Track OpenSource
             </h1>
           </Link>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600 sm:text-base">
@@ -73,14 +79,28 @@ export function DashboardClient({
             growth ratio, contributor movement, activity, and maintenance pressure.
           </p>
         </div>
-        <div className="grid grid-cols-4 gap-3 text-sm">
-          <Metric label="Tracked" value={trackedCount || 0} />
-          <WindowSelector currentWindow={timeframeDays} />
-          <Metric
-            label="Leader"
-            value={leader ? formatScore(leader.trendScore) : "0.0"}
-          />
-          <ScanTrigger />
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-end h-8">
+            <Show when="signed-out">
+              <SignInButton>
+                <button className="text-sm font-medium text-neutral-500 hover:text-neutral-900 transition">
+                  Sign in to track projects &rarr;
+                </button>
+              </SignInButton>
+            </Show>
+            <Show when="signed-in">
+              <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
+            </Show>
+          </div>
+          <div className="grid grid-cols-4 gap-3 text-sm">
+            <Metric label="Tracked" value={trackedCount || 0} />
+            <WindowSelector currentWindow={timeframeDays} />
+            <Metric
+              label="Leader"
+              value={leader ? formatScore(leader.trendScore) : "0.0"}
+            />
+            <ScanTrigger />
+          </div>
         </div>
       </header>
 
