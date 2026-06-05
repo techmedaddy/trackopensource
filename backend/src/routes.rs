@@ -547,7 +547,7 @@ pub async fn clerk_webhook(
 
     let payload = String::from_utf8(body.to_vec()).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    if let Err(e) = webhook.verify(&payload, &headers) {
+    if let Err(e) = webhook.verify(payload.as_bytes(), &headers) {
         tracing::error!("Webhook verification failed: {:?}", e);
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -563,17 +563,17 @@ pub async fn clerk_webhook(
     if clerk_event.r#type == "user.created" {
         let email = clerk_event.data.email_addresses.first().map(|e| e.email_address.clone()).unwrap_or_default();
         
-        let _ = sqlx::query!(
+        let _ = sqlx::query(
             r#"
             INSERT INTO users (clerk_id, email, first_name, last_name)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (clerk_id) DO NOTHING
-            "#,
-            clerk_event.data.id,
-            email,
-            clerk_event.data.first_name,
-            clerk_event.data.last_name
+            "#
         )
+        .bind(&clerk_event.data.id)
+        .bind(&email)
+        .bind(&clerk_event.data.first_name)
+        .bind(&clerk_event.data.last_name)
         .execute(&state.pool)
         .await;
     }
