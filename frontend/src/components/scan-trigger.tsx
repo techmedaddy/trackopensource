@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 
 export function ScanTrigger() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const { getToken } = useAuth();
 
   const triggerScan = async () => {
     setIsLoading(true);
@@ -13,8 +15,12 @@ export function ScanTrigger() {
     setIsError(false);
 
     try {
+      const token = await getToken();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"}/trigger`, {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
       });
 
       const data = await response.json();

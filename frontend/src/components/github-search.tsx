@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { compactNumber } from "@/lib/api";
+import { useAuth } from "@clerk/nextjs";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api";
@@ -21,6 +22,7 @@ export function GithubSearchPanel() {
   const [results, setResults] = useState<GithubRepo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [trackedIds, setTrackedIds] = useState<Set<number>>(new Set());
+  const { getToken } = useAuth();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,9 +64,13 @@ export function GithubSearchPanel() {
 
   const handleTrack = async (repo: GithubRepo) => {
     try {
+      const token = await getToken();
       const response = await fetch(`${API_BASE_URL}/track`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` 
+        },
         body: JSON.stringify({
           githubId: repo.id,
           owner: repo.owner.login,

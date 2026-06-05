@@ -1,5 +1,6 @@
 use axum::{
     routing::{get, post},
+    middleware,
     Router,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -40,15 +41,20 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let protected_routes = Router::new()
+        .route("/api/track", post(routes::track_repository))
+        .route("/api/trigger", post(routes::trigger_scan))
+        .route_layer(middleware::from_fn(backend::auth::require_auth));
+
     let app = Router::new()
         .route("/", get(routes::health_check))
         .route("/api/trending", get(routes::trending))
         .route("/api/fastest-growing", get(routes::fastest_growing))
         .route("/api/search", get(routes::search))
-        .route("/api/track", post(routes::track_repository))
         .route("/api/repos/:id", get(routes::repo_detail))
-        .route("/api/trigger", post(routes::trigger_scan))
         .route("/api/facets", get(routes::facets))
+        .route("/api/webhooks/clerk", post(routes::clerk_webhook))
+        .merge(protected_routes)
         .layer(cors)
         .with_state(state);
 

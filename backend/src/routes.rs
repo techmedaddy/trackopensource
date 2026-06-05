@@ -3,7 +3,10 @@ use crate::{
     models::{Facets, RankedRepository, Ranking, Repository, RepositoryDetail, Snapshot},
 };
 use axum::{
+    body::Bytes,
     extract::{Path, Query, State},
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
     Json,
 };
 use serde::Deserialize;
@@ -508,4 +511,72 @@ fn valid_timeframe(timeframe_days: Option<i32>) -> i32 {
         7 | 30 | 90 => timeframe_days.unwrap_or(30),
         _ => 30,
     }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ClerkWebhook {
+    pub data: ClerkUserData,
+    pub r#type: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ClerkUserData {
+    pub id: String,
+    pub email_addresses: Vec<ClerkEmailAddress>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ClerkEmailAddress {
+    pub email_address: String,
+}
+
+pub async fn clerk_webhook(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, StatusCode> {
+    let secret = std::env::var("CLERK_WEBHOOK_SECRET").unwrap_or_default();
+    if secret.is_empty() {
+        tracing::error!("CLERK_WEBHOOK_SECRET not set");
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    
+    let webhook = svix::webhooks::Webhook::new(&secret).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let payload = String::from_utf8(body.to_vec()).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    if let Err(e) = webhook.verify(&payload, &headers) {
+        tracing::error!("Webhook verification failed: {:?}", e);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let clerk_event: ClerkWebhook = match serde_json::from_str(&payload) {
+        Ok(evt) => evt,
+        Err(e) => {
+            tracing::error!("Failed to parse webhook JSON: {:?}", e);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    };
+
+    if clerk_event.r#type == "user.created" {
+        let email = clerk_event.data.email_addresses.first().map(|e| e.email_address.clone()).unwrap_or_default();
+        
+        let _ = sqlx::query!(
+            r#"
+            INSERT INTO users (clerk_id, email, first_name, last_name)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (clerk_id) DO NOTHING
+            "#,
+            clerk_event.data.id,
+            email,
+            clerk_event.data.first_name,
+            clerk_event.data.last_name
+        )
+        .execute(&state.pool)
+        .await;
+    }
+
+    Ok(StatusCode::OK)
 }
