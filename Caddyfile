@@ -1,3 +1,21 @@
 trackopensource.duckdns.org {
+    # Security headers
+    header {
+        # HSTS — force browsers to always use HTTPS (1 year)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Prevent MIME-type sniffing
+        X-Content-Type-Options "nosniff"
+        # Block clickjacking via iframes
+        X-Frame-Options "DENY"
+        # Control referrer information leakage
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Restrict what resources the browser can load
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://feasible-chamois-20.clerk.accounts.dev https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.clerk.com https://*.gravatar.com https://img.clerk.com; connect-src 'self' https://feasible-chamois-20.clerk.accounts.dev https://*.clerk.accounts.dev; frame-src https://feasible-chamois-20.clerk.accounts.dev https://*.clerk.accounts.dev; worker-src 'self' blob:;"
+        # Prevent information leakage
+        X-Permitted-Cross-Domain-Policies "none"
+        # Remove server identification
+        -Server
+    }
+
     reverse_proxy frontend:3000
 }

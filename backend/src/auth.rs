@@ -54,15 +54,20 @@ pub async fn require_auth(
     };
 
     let mut validation = Validation::new(Algorithm::RS256);
-    // Clerk tokens don't carry an audience claim by default,
-    // but we enforce issuer to prevent cross-tenant token reuse.
+    // Clerk tokens don't carry a standard `aud` claim, so we disable that check.
+    // Instead we enforce two alternative guarantees:
+    //   1. `iss` — ensures the token came from our specific Clerk instance
+    //   2. `azp` — ensures it was minted for our frontend app (checked post-decode)
     validation.validate_aud = false;
     
-    // Validate the issuer matches our Clerk instance
-    let clerk_issuer = std::env::var("CLERK_ISSUER").ok();
-    if let Some(ref issuer) = clerk_issuer {
-        validation.set_issuer(&[issuer]);
+    // Enforce issuer — reject tokens from other Clerk instances
+    let clerk_issuer = std::env::var("CLERK_ISSUER")
+        .unwrap_or_else(|_| "".to_string());
+    if clerk_issuer.is_empty() {
+        tracing::error!("CLERK_ISSUER is not configured — cannot validate tokens");
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
+    validation.set_issuer(&[&clerk_issuer]);
 
     let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
         Ok(data) => data,
@@ -71,6 +76,22 @@ pub async fn require_auth(
             return Err(StatusCode::UNAUTHORIZED);
         }
     };
+
+    // Validate azp (authorized party) if configured — ensures the token
+    // was issued for our specific frontend application, not a different Clerk app
+    if let Ok(expected_azp) = std::env::var("CLERK_AZP") {
+        match &token_data.claims.azp {
+            Some(azp) if azp == &expected_azp => {},
+            Some(azp) => {
+                tracing::warn!("JWT azp mismatch: expected {}, got {}", expected_azp, azp);
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+            None => {
+                tracing::warn!("JWT missing azp claim");
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+        }
+    }
 
     req.extensions_mut().insert(token_data.claims);
 
