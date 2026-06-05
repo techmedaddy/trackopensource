@@ -5,7 +5,8 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
+use axum::http::{HeaderValue, Method, header};
 
 use std::sync::{Arc, Mutex};
 use backend::routes::{self, AppState};
@@ -36,10 +37,13 @@ async fn main() {
         manual_triggers: Arc::new(Mutex::new(Vec::new())),
     };
 
+    // Restrict CORS to known origins only
+    let allowed_origin = std::env::var("CORS_ORIGIN")
+        .unwrap_or_else(|_| "https://trackopensource.duckdns.org".to_string());
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(allowed_origin.parse::<HeaderValue>().unwrap())
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
 
     let protected_routes = Router::new()
         .route("/api/track", post(routes::track_repository))

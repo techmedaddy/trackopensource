@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 pub struct Claims {
     pub sub: String,
     pub exp: usize,
+    pub iss: Option<String>,
+    pub azp: Option<String>,
 }
 
 pub async fn require_auth(
@@ -52,7 +54,15 @@ pub async fn require_auth(
     };
 
     let mut validation = Validation::new(Algorithm::RS256);
-    validation.validate_aud = false; 
+    // Clerk tokens don't carry an audience claim by default,
+    // but we enforce issuer to prevent cross-tenant token reuse.
+    validation.validate_aud = false;
+    
+    // Validate the issuer matches our Clerk instance
+    let clerk_issuer = std::env::var("CLERK_ISSUER").ok();
+    if let Some(ref issuer) = clerk_issuer {
+        validation.set_issuer(&[issuer]);
+    }
 
     let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
         Ok(data) => data,

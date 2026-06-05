@@ -26,10 +26,18 @@ WORKDIR /app
 
 ENV NODE_ENV production
 
+# Create a non-root user for security
+RUN addgroup --system --gid 1001 appuser && \
+    adduser --system --uid 1001 appuser
+
 # Only copy what's needed for production
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 3000
 
