@@ -115,7 +115,7 @@ export function HypeVsHiringMatrix({ data }: { data: RankedRepository[] }) {
           <Scatter 
             name="Repositories" 
             data={plotData} 
-            onClick={(e) => {
+            onClick={(e: any) => {
               if (e && e.id) router.push(`/repos/${e.id}`);
             }}
             className="cursor-pointer transition-opacity hover:opacity-80"
