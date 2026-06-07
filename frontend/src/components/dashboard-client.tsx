@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { SearchPanel } from "@/components/search-panel";
 import { GithubSearchPanel } from "@/components/github-search";
 import { ScanTrigger } from "@/components/scan-trigger";
+import { HypeVsHiringMatrix } from "@/components/scatter-plot";
 import {
   compactNumber,
   formatScore,
@@ -57,6 +58,12 @@ export function DashboardClient({
     { fallbackData: initialRising, keepPreviousData: true, refreshInterval: 60000 }
   );
 
+  const { data: matrixData = [] } = useSWR<RankedRepository[]>(
+    `/api/trending?limit=50&timeframeDays=${timeframeDays}`,
+    fetcher,
+    { fallbackData: initialTrending, keepPreviousData: true, refreshInterval: 60000 }
+  );
+
   const leader = trending[0];
   const trackedCount = new Set(
     [...trending, ...fastestGrowing, ...risingProjects].map((repo) => repo.id)
@@ -104,8 +111,25 @@ export function DashboardClient({
         </div>
       </header>
 
-      <SearchPanel initialResults={trending.slice(0, 6)} />
-      <GithubSearchPanel />
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div className="flex flex-col h-full">
+          <SearchPanel initialResults={trending.slice(0, 4)} />
+        </div>
+
+        <div className="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-sm h-full">
+          <SectionHeader
+            title="Hype vs. Hiring Matrix"
+            subtitle="Visualize the gap between developer mindshare and corporate adoption."
+          />
+          <div className="flex-1 p-4 pt-0">
+            <HypeVsHiringMatrix data={matrixData} />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <GithubSearchPanel />
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
         <div className="rounded-lg border border-neutral-200 bg-white shadow-sm">
@@ -207,37 +231,56 @@ function RepositoryTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-left text-sm">
+      <table className="w-full min-w-[900px] text-left text-sm">
         <thead className="text-xs uppercase tracking-[0.14em] text-neutral-500">
           <tr className="border-b border-neutral-200">
             <th className="px-5 py-3 font-medium">Repository</th>
-            <th className="px-5 py-3 font-medium">Language</th>
-            <th className="px-5 py-3 font-medium">Stars</th>
+            <th className="px-5 py-3 font-medium">Traction Profile</th>
+            <th className="px-5 py-3 font-medium">Signals</th>
             <th className="px-5 py-3 font-medium">Velocity</th>
-            <th className="px-5 py-3 font-medium">{rankLabel}</th>
+            <th className="px-5 py-3 font-medium text-right">{rankLabel}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-200">
           {repos.map((repo) => (
             <tr key={repo.id} className="transition hover:bg-green-50/40">
-              <td className="px-5 py-4">
+              <td className="px-5 py-4 w-[30%]">
                 <div className="flex items-center gap-2">
                   <Link href={`/repos/${repo.id}`} className="font-medium hover:text-green-700">
                     {repoFullName(repo)}
                   </Link>
-                  {repo.socialScore > 20 && (
-                    <span className="inline-flex rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800" title="High Social Momentum">
-                      🔥 Trending
-                    </span>
-                  )}
                 </div>
-                <p className="mt-1 line-clamp-1 max-w-xl text-neutral-500">
+                <p className="mt-1 line-clamp-1 text-neutral-500">
                   {repo.description ?? "No description available."}
                 </p>
+                <div className="mt-2 flex items-center gap-2 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
+                  <span>{repo.language ?? "Unknown"}</span>
+                  <span>•</span>
+                  <span>{compactNumber.format(repo.stars)} stars</span>
+                </div>
               </td>
-              <td className="px-5 py-4 text-neutral-600">{repo.language ?? "Unknown"}</td>
-              <td className="px-5 py-4">{compactNumber.format(repo.stars)}</td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-4 w-[20%]">
+                <div className="flex flex-col gap-1.5">
+                  <MiniBar label="Hiring" score={repo.hiringScore} colorClass="bg-blue-500" />
+                  <MiniBar label="Social" score={repo.socialScore} colorClass="bg-orange-500" />
+                  <MiniBar label="Growth" score={repo.growthScore} colorClass="bg-emerald-500" />
+                </div>
+              </td>
+              <td className="px-5 py-4 w-[30%]">
+                <div className="flex flex-col gap-1.5">
+                  {repo.signals && repo.signals.length > 0 ? (
+                    repo.signals.map((sig, idx) => (
+                      <span key={idx} className="inline-flex w-fit items-center gap-1.5 text-[11px] font-medium text-neutral-700 bg-white px-2 py-1 rounded-md border border-neutral-200 shadow-sm" title={sig.description}>
+                        <span>{sig.variant === "enterprise" ? "🏢" : sig.variant === "social" ? "💬" : "📈"}</span>
+                        <span className="line-clamp-1">{sig.description}</span>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-neutral-400 italic">Calibrating signals...</span>
+                  )}
+                </div>
+              </td>
+              <td className="px-5 py-4 w-[10%]">
                 <div className="font-medium">
                   {repo.starsGained >= 0 ? "+" : ""}
                   {compactNumber.format(repo.starsGained)}
@@ -246,13 +289,26 @@ function RepositoryTable({
                   {repo.starVelocity.toFixed(1)} / day
                 </div>
               </td>
-              <td className="px-5 py-4">
+              <td className="px-5 py-4 text-right w-[10%]">
                 <ScorePill score={repo.trendScore} />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function MiniBar({ label, score, colorClass }: { label: string; score: number; colorClass: string }) {
+  const safeScore = isNaN(score) ? 0 : Math.min(Math.max(score, 0), 100);
+  return (
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="w-10 text-neutral-500 uppercase tracking-widest">{label}</span>
+      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-neutral-100">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${safeScore}%` }} />
+      </div>
+      <span className="w-5 text-right font-medium text-neutral-700">{Math.round(safeScore)}</span>
     </div>
   );
 }
@@ -267,11 +323,14 @@ function VelocityRow({ repo }: { repo: RankedRepository }) {
         <div>
           <div className="flex items-center gap-2">
             <div className="font-medium">{repoFullName(repo)}</div>
-            {repo.socialScore > 20 && (
-              <span className="inline-flex rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800" title="High Social Momentum">
-                🔥 Trending
-              </span>
-            )}
+            <div className="hidden sm:flex items-center gap-1.5">
+              {repo.signals?.slice(0, 2).map((sig, idx) => (
+                <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 border border-neutral-200 shadow-sm" title={sig.description}>
+                  <span>{sig.variant === "enterprise" ? "🏢" : sig.variant === "social" ? "💬" : "📈"}</span>
+                  <span>{sig.variant === "enterprise" ? "Hiring" : sig.variant === "social" ? "Social" : "Surge"}</span>
+                </span>
+              ))}
+            </div>
           </div>
           <div className="mt-1 text-sm text-neutral-500">{repo.language ?? "Unknown"}</div>
         </div>
@@ -293,29 +352,36 @@ function RisingCard({ repo }: { repo: RankedRepository }) {
   return (
     <Link
       href={`/repos/${repo.id}`}
-      className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-green-500 hover:bg-green-50/50"
+      className="flex flex-col justify-between rounded-lg border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-green-500 hover:bg-green-50/50"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div>
             <div className="font-semibold">{repoFullName(repo)}</div>
-            {repo.socialScore > 20 && (
-              <span className="inline-flex rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800" title="High Social Momentum">
-                🔥 Trending
-              </span>
-            )}
+            <p className="mt-2 line-clamp-2 text-sm leading-6 text-neutral-500">
+              {repo.description ?? "No description available."}
+            </p>
           </div>
-          <p className="mt-2 line-clamp-3 text-sm leading-6 text-neutral-500">
-            {repo.description ?? "No description available."}
-          </p>
+          <ScorePill score={repo.trendScore} />
         </div>
-        <ScorePill score={repo.trendScore} />
+        
+        {repo.signals && repo.signals.length > 0 && (
+          <div className="mt-4 flex flex-col gap-1.5">
+            {repo.signals.map((sig, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded border border-neutral-100">
+                <span className="text-sm">{sig.variant === "enterprise" ? "🏢" : sig.variant === "social" ? "💬" : "📈"}</span>
+                <span className="line-clamp-1">{sig.description}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      <div className="mt-5 flex flex-wrap gap-2 text-xs text-neutral-500">
-        <span className="rounded-full bg-neutral-100 px-2 py-1">
+
+      <div className="mt-5 flex flex-wrap items-center gap-2 text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
+        <span className="rounded bg-neutral-100 px-2 py-1">
           {compactNumber.format(repo.stars)} stars
         </span>
-        <span className="rounded-full bg-neutral-100 px-2 py-1">
+        <span className="rounded bg-neutral-100 px-2 py-1">
           {repo.language ?? "Unknown"}
         </span>
       </div>

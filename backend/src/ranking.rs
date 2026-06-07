@@ -141,7 +141,23 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
     let scored_count = scored_rankings.len();
 
     for ranking in scored_rankings {
+        let repo_id = ranking.raw.repo_id;
+        let timeframe_days = ranking.raw.timeframe_days;
+        let hiring_score = ranking.hiring_score;
+        let social_score = ranking.social_score;
+        let trend_score = ranking.trend_score;
+
         upsert_ranking(pool, ranking).await?;
+
+        if timeframe_days == 30 {
+            crate::alerts::check_and_dispatch_alerts(
+                pool,
+                repo_id,
+                hiring_score,
+                social_score,
+                trend_score,
+            ).await;
+        }
     }
 
     Ok(scored_count)

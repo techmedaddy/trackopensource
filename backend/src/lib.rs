@@ -7,3 +7,4 @@ pub mod hacker_news;
 pub mod reddit;
 pub mod jobs;
 pub mod auth;
+pub mod alerts;

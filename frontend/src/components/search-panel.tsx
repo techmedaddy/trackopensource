@@ -36,7 +36,7 @@ export function SearchPanel({ initialResults }: SearchPanelProps) {
       try {
         const params = new URLSearchParams({
           q: trimmed,
-          limit: "8",
+          limit: "4",
           timeframeDays: "30",
         });
         const response = await fetch(`${API_BASE_URL}/search?${params}`, {
@@ -62,7 +62,7 @@ export function SearchPanel({ initialResults }: SearchPanelProps) {
   }, [initialResults, query]);
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+    <section className="flex flex-col h-full rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-neutral-950">Search momentum</h2>
@@ -82,7 +82,7 @@ export function SearchPanel({ initialResults }: SearchPanelProps) {
         onChange={(event) => setQuery(event.target.value)}
       />
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 flex flex-1 flex-col gap-3">
         {results.length === 0 ? (
           <div className="rounded-md border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
             No matching repositories yet. Run the collector and ranking engine to fill the radar.
