@@ -4,6 +4,7 @@ import { SignInButton, Show, UserButton } from "@clerk/nextjs";
 import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { SearchPanel } from "@/components/search-panel";
 import { GithubSearchPanel } from "@/components/github-search";
 import { ScanTrigger } from "@/components/scan-trigger";
@@ -38,30 +39,45 @@ export function DashboardClient({
   const windowStr = typeof windowParam === "string" ? windowParam : "30";
   const timeframeDays = ["7", "30", "90"].includes(windowStr) ? windowStr : "30";
 
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  // Fetch available categories from the backend
+  const { data: facets } = useSWR<{ categories: string[]; languages: string[] }>(
+    `/api/facets`,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) return { categories: [], languages: [] };
+      return res.json();
+    },
+    { refreshInterval: 300000 }
+  );
+
+  const categoryParam = activeCategory ? `&category=${encodeURIComponent(activeCategory)}` : "";
+
   // Use SWR for client-side stale-while-revalidate caching
   // We pass the Server-Side Rendered data as `fallbackData` so the page loads instantly.
   const { data: trending = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=10&timeframeDays=${timeframeDays}`,
+    `/api/trending?limit=10&timeframeDays=${timeframeDays}${categoryParam}`,
     fetcher,
-    { fallbackData: initialTrending, keepPreviousData: true, refreshInterval: 60000 }
+    { fallbackData: activeCategory ? undefined : initialTrending, keepPreviousData: true, refreshInterval: 60000 }
   );
 
   const { data: fastestGrowing = [] } = useSWR<RankedRepository[]>(
-    `/api/fastest-growing?limit=8&timeframeDays=${timeframeDays}`,
+    `/api/fastest-growing?limit=8&timeframeDays=${timeframeDays}${categoryParam}`,
     fetcher,
-    { fallbackData: initialFastest, keepPreviousData: true, refreshInterval: 60000 }
+    { fallbackData: activeCategory ? undefined : initialFastest, keepPreviousData: true, refreshInterval: 60000 }
   );
 
   const { data: risingProjects = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=1000`,
+    `/api/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=1000${categoryParam}`,
     fetcher,
-    { fallbackData: initialRising, keepPreviousData: true, refreshInterval: 60000 }
+    { fallbackData: activeCategory ? undefined : initialRising, keepPreviousData: true, refreshInterval: 60000 }
   );
 
   const { data: matrixData = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=50&timeframeDays=${timeframeDays}`,
+    `/api/trending?limit=50&timeframeDays=${timeframeDays}${categoryParam}`,
     fetcher,
-    { fallbackData: initialTrending, keepPreviousData: true, refreshInterval: 60000 }
+    { fallbackData: activeCategory ? undefined : initialTrending, keepPreviousData: true, refreshInterval: 60000 }
   );
 
   const leader = trending[0];
@@ -110,6 +126,12 @@ export function DashboardClient({
           </div>
         </div>
       </header>
+
+      <CategoryFilter
+        categories={facets?.categories ?? []}
+        activeCategory={activeCategory}
+        onSelect={setActiveCategory}
+      />
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="flex flex-col h-full">
@@ -401,6 +423,60 @@ function EmptyState() {
   return (
     <div className="p-5 text-sm text-neutral-500">
       Radar is calibrating. Click &quot;Trigger Live Scan&quot; above to begin discovering repositories.
+    </div>
+  );
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  "AI": "🤖",
+  "Backend": "⚙️",
+  "Database": "🗄️",
+  "DevOps": "🔧",
+  "Frontend": "🎨",
+  "Go": "🐹",
+  "Infrastructure": "☁️",
+  "Python": "🐍",
+  "Rust": "🦀",
+  "Security": "🔒",
+};
+
+function CategoryFilter({
+  categories,
+  activeCategory,
+  onSelect,
+}: {
+  categories: string[];
+  activeCategory: string | null;
+  onSelect: (category: string | null) => void;
+}) {
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium uppercase tracking-widest text-neutral-400 mr-1">Filter</span>
+      <button
+        onClick={() => onSelect(null)}
+        className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+          activeCategory === null
+            ? "bg-green-600 text-white shadow-sm"
+            : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+        }`}
+      >
+        All
+      </button>
+      {categories.map((cat) => (
+        <button
+          key={cat}
+          onClick={() => onSelect(activeCategory === cat ? null : cat)}
+          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+            activeCategory === cat
+              ? "bg-green-600 text-white shadow-sm"
+              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+          }`}
+        >
+          {CATEGORY_ICONS[cat] ?? "📦"} {cat}
+        </button>
+      ))}
     </div>
   );
 }
