@@ -46,6 +46,7 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        - INTERNAL_API_URL=http://backend:8080/api
     # In production, we don't expose port 80 directly from next.js anymore. 
     # Instead, caddy handles incoming ports 80 and 443 and proxies to this container internally.
     expose:
