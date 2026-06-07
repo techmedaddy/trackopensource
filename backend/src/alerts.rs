@@ -45,18 +45,23 @@ pub async fn check_and_dispatch_alerts(
     }
 
     // Fetch repository details to construct the message
-    let repo_data = match sqlx::query!(
-        "SELECT owner, name, description FROM repositories WHERE id = $1",
-        repo_id
+    let repo_row = match sqlx::query(
+        "SELECT owner, name, description FROM repositories WHERE id = $1"
     )
+    .bind(repo_id)
     .fetch_optional(pool)
     .await
     {
-        Ok(Some(data)) => data,
+        Ok(Some(row)) => row,
         _ => return, // Repo not found or DB error
     };
 
-    let repo_full_name = format!("{}/{}", repo_data.owner, repo_data.name);
+    use sqlx::Row;
+    let owner: String = repo_row.get("owner");
+    let name: String = repo_row.get("name");
+    let description: Option<String> = repo_row.get("description");
+
+    let repo_full_name = format!("{}/{}", owner, name);
 
     let (title, color) = if is_golden_zone {
         (format!("🌟 Golden Zone Entry: {}", repo_full_name), 0x10b981) // Green
@@ -64,7 +69,7 @@ pub async fn check_and_dispatch_alerts(
         (format!("🚀 Momentum Breakout: {}", repo_full_name), 0xf59e0b) // Amber
     };
 
-    let desc = repo_data.description.unwrap_or_else(|| "No description available.".to_string());
+    let desc = description.unwrap_or_else(|| "No description available.".to_string());
 
     let payload = json!({
         "embeds": [{
