@@ -36,22 +36,61 @@ pub struct JobMention {
     pub posted_at: chrono::DateTime<Utc>,
 }
 
-pub async fn discover_job_mentions(
-    client: &Client,
-    repo_id: Uuid,
-    repo_name: &str,
-) -> Result<Vec<JobMention>, Box<dyn std::error::Error>> {
-    // 1. Find the latest 3 "Who is hiring" threads
-    let thread_url = "https://hn.algolia.com/api/v1/search?tags=story,author_whoishiring&query=\"Ask HN: Who is hiring?\"&hitsPerPage=3";
+pub fn get_aliases(repo_name: &str) -> Vec<String> {
+    let mut aliases = vec![repo_name.to_lowercase()];
     
-    let thread_resp = client.get(thread_url).send().await?.json::<HNStorySearchResponse>().await?;
-    let mut mentions = Vec::new();
+    match repo_name.to_lowercase().as_str() {
+        "opentelemetry" | "opentelemetry-rust" | "opentelemetry-go" => {
+            aliases.extend(vec!["otel".to_string(), "opentelemetry".to_string()]);
+        }
+        "kubernetes" | "k8s" => {
+            aliases.extend(vec!["k8s".to_string(), "kubernetes".to_string()]);
+        }
+        "postgresql" | "postgres" => {
+            aliases.extend(vec!["postgres".to_string(), "postgresql".to_string(), "psql".to_string()]);
+        }
+        "react" | "reactjs" => {
+            aliases.extend(vec!["react".to_string(), "react.js".to_string()]);
+        }
+        "vue" | "vuejs" => {
+            aliases.extend(vec!["vue".to_string(), "vue.js".to_string()]);
+        }
+        "next.js" | "nextjs" | "next" => {
+            aliases.extend(vec!["next.js".to_string(), "nextjs".to_string()]);
+        }
+        "node" | "nodejs" => {
+            aliases.extend(vec!["nodejs".to_string(), "node.js".to_string()]);
+        }
+        "go" | "golang" => {
+            aliases.push("golang".to_string());
+        }
+        "rust" | "rustlang" => {
+            aliases.push("rustlang".to_string());
+        }
+        _ => {}
+    }
+    
+    aliases.sort();
+    aliases.dedup();
+    aliases
+}
 
-    for story in thread_resp.hits {
-        // 2. Fetch comments for this thread that explicitly mention the repository
+pub async fn scrape_hn_hiring_threads(
+    client: &Client,
+    pool: &PgPool,
+    tracked_repos: &[(Uuid, String)],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let thread_url = "https://hn.algolia.com/api/v1/search?tags=story,author_whoishiring&query=\"Ask HN: Who is hiring?\"&hitsPerPage=2";
+    let thread_resp = client.get(thread_url).send().await?.json::<HNStorySearchResponse>().await?;
+
+    let mut all_mentions = Vec::new();
+
+    for story in &thread_resp.hits {
+        tracing::info!("Scraping HN Hiring Thread: {}", story.object_id);
+        
         let comments_url = format!(
-            "https://hn.algolia.com/api/v1/search?tags=comment,story_{}&query={}&hitsPerPage=50",
-            story.object_id, repo_name
+            "https://hn.algolia.com/api/v1/search?tags=comment,story_{}&hitsPerPage=1000",
+            story.object_id
         );
 
         let comments_resp = match client.get(&comments_url).send().await {
@@ -64,11 +103,13 @@ pub async fn discover_job_mentions(
 
         for comment in comments_resp.hits {
             if let Some(text) = comment.comment_text {
-                // Heuristic: "Company Name | Job Title | Location" is standard HN hiring format
+                let text_lower = text.to_lowercase();
+                
+                // Parse company & title from standard HN format
                 let first_line = text.lines().next().unwrap_or("");
                 let chunks: Vec<&str> = first_line.split('|').collect();
                 
-                let raw_company = chunks.first().unwrap_or(&"Unknown Company").trim().to_string();
+                let raw_company = chunks.first().copied().unwrap_or("Unknown Company").trim().to_string();
                 let raw_title = chunks.get(1).map(|t| {
                     let mut s = t.trim().to_string();
                     if s.len() > 255 {
@@ -78,7 +119,6 @@ pub async fn discover_job_mentions(
                     s
                 });
                 
-                // Extremely basic HTML stripping just in case Algolia includes it
                 let clean_company = raw_company
                     .replace("<p>", "")
                     .replace("</p>", "")
@@ -95,25 +135,42 @@ pub async fn discover_job_mentions(
                     .map(|d| d.with_timezone(&Utc))
                     .unwrap_or_else(|_| Utc::now());
 
-                mentions.push(JobMention {
-                    repo_id,
-                    company_name: final_company,
-                    job_title: raw_title,
-                    source_url: format!("https://news.ycombinator.com/item?id={}", comment.object_id),
-                    posted_at,
-                });
+                let source_url = format!("https://news.ycombinator.com/item?id={}", comment.object_id);
+
+                // Check which repos are mentioned in this comment
+                for (repo_id, repo_name) in tracked_repos {
+                    let aliases = get_aliases(repo_name);
+                    let mut found = false;
+                    
+                    for alias in aliases {
+                        // Word boundary check to prevent "go" matching "algo"
+                        let padded_alias = format!(" {} ", alias);
+                        let text_padded = format!(" {} ", text_lower.replace(|c: char| !c.is_alphanumeric(), " "));
+                        
+                        if text_padded.contains(&padded_alias) {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if found {
+                        all_mentions.push(JobMention {
+                            repo_id: *repo_id,
+                            company_name: final_company.clone(),
+                            job_title: raw_title.clone(),
+                            source_url: source_url.clone(),
+                            posted_at,
+                        });
+                    }
+                }
             }
         }
     }
 
-    Ok(mentions)
-}
+    tracing::info!("Found {} total job mentions across {} threads.", all_mentions.len(), thread_resp.hits.len());
 
-pub async fn save_job_mentions(
-    pool: &PgPool,
-    mentions: Vec<JobMention>,
-) -> Result<(), sqlx::Error> {
-    for m in mentions {
+    // Batch insert
+    for m in all_mentions {
         sqlx::query(
             r#"
             INSERT INTO job_mentions (repo_id, company_name, job_title, source_url, posted_at)
@@ -129,5 +186,6 @@ pub async fn save_job_mentions(
         .execute(pool)
         .await?;
     }
+
     Ok(())
 }

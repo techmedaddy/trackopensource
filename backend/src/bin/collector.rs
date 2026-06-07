@@ -125,23 +125,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(r) => r,
                     Err(e) => {
                         tracing::error!("Request failed for {}/{}: {}", owner, name, e);
-                        return;
+                        return None;
                     }
                 };
                 
                 if resp.status() == reqwest::StatusCode::FORBIDDEN {
                     tracing::error!("Rate limit hit or forbidden access for {}/{}", owner, name);
-                    return; // Note: with streams, we just skip this task rather than breaking the loop
+                    return None;
                 } else if !resp.status().is_success() {
                     tracing::error!("Failed to fetch {}/{}: {}", owner, name, resp.status());
-                    return;
+                    return None;
                 }
 
                 let repo_data = match resp.json::<GithubRepo>().await {
                     Ok(data) => data,
                     Err(e) => {
                         tracing::error!("Failed to parse JSON for {}/{}: {}", owner, name, e);
-                        return;
+                        return None;
                     }
                 };
 
@@ -186,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(id) => id,
                     Err(e) => {
                         tracing::error!("Failed to upsert {}/{}: {}", owner, name, e);
-                        return;
+                        return None;
                     }
                 };
 
@@ -214,23 +214,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tracing::error!("Failed to insert snapshot for {}/{}: {}", owner, name, e);
                 }
 
-                // 3. Fetch and Insert Job Demand (Phase 3)
-                match backend::jobs::discover_job_mentions(&client, repo_id, &name).await {
-                    Ok(mentions) => {
-                        if !mentions.is_empty() {
-                            tracing::info!("Found {} job mentions for {}/{}", mentions.len(), owner, name);
-                            if let Err(e) = backend::jobs::save_job_mentions(&pool, mentions).await {
-                                tracing::error!("Failed to save job mentions for {}/{}: {}", owner, name, e);
-                            }
-                        }
-                    }
-                    Err(e) => tracing::error!("Failed to fetch job mentions for {}/{}: {}", owner, name, e),
-                }
-
                 // 4. Fetch and Insert Social Signals (Phase 2: Hacker News & Reddit)
-                match hacker_news::fetch_hn_mentions(&client, repo_id, &owner, &name).await {
+                match backend::hacker_news::fetch_hn_mentions(&client, repo_id, &owner, &name).await {
                     Ok(mentions) => {
-                        if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
+                        if let Err(e) = backend::hacker_news::save_social_mentions(&pool, mentions).await {
                             tracing::error!("Failed to save HN mentions for {}/{}: {}", owner, name, e);
                         }
                     }
@@ -239,9 +226,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
-                match reddit::fetch_reddit_mentions(&client, repo_id, &owner, &name).await {
+                match backend::reddit::fetch_reddit_mentions(&client, repo_id, &owner, &name).await {
                     Ok(mentions) => {
-                        if let Err(e) = hacker_news::save_social_mentions(&pool, mentions).await {
+                        if let Err(e) = backend::hacker_news::save_social_mentions(&pool, mentions).await {
                             tracing::error!("Failed to save Reddit mentions for {}/{}: {}", owner, name, e);
                         }
                     }
@@ -249,11 +236,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, e);
                     }
                 }
+
+                Some((repo_id, name))
             }
         })
         .buffer_unordered(5);
 
-    stream.collect::<Vec<()>>().await;
+    let processed_repos: Vec<(Uuid, String)> = stream.filter_map(|opt| async move { opt }).collect().await;
+
+    tracing::info!("Starting Job Collector Cron for {} repositories...", processed_repos.len());
+    if let Err(e) = backend::jobs::scrape_hn_hiring_threads(&client, &pool, processed_repos.as_slice()).await {
+        tracing::error!("Job Collector failed: {}", e);
+    }
 
     tracing::info!("Data collection pipeline complete!");
     Ok(())
