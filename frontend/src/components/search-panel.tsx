@@ -9,8 +9,7 @@ import {
   type RankedRepository,
 } from "@/lib/api";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api";
+const API_BASE_URL = "/api";
 
 type SearchPanelProps = {
   initialResults: RankedRepository[];

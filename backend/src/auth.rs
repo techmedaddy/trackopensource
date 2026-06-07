@@ -41,8 +41,14 @@ pub async fn require_auth(
     let pem = pem_raw.replace("\\n", "\n");
 
     if pem.is_empty() {
-        tracing::error!("CLERK_PEM_PUBLIC_KEY is not configured");
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        tracing::warn!("CLERK_PEM_PUBLIC_KEY is not configured. Bypassing auth for local development.");
+        req.extensions_mut().insert(Claims {
+            sub: "local_dev_user".to_string(),
+            exp: 0,
+            iss: None,
+            azp: None,
+        });
+        return Ok(next.run(req).await);
     }
 
     let decoding_key = match DecodingKey::from_rsa_pem(pem.as_bytes()) {

@@ -133,10 +133,33 @@ pub async fn search(
         .push(")) ORDER BY rank.trend_score DESC, rank.star_velocity DESC LIMIT ")
         .push_bind(limit);
 
-    let repos = builder
+    let mut repos = builder
         .build_query_as::<RankedRepository>()
         .fetch_all(&state.pool)
         .await?;
+
+    for repo in &mut repos {
+        let mut sigs = Vec::new();
+        if repo.stars_gained > 50 {
+            sigs.push(crate::models::Signal {
+                variant: "surge".to_string(),
+                description: format!("+{} stars in the past {} days", repo.stars_gained, repo.timeframe_days),
+            });
+        }
+        if repo.hiring_score > 30.0 {
+            sigs.push(crate::models::Signal {
+                variant: "enterprise".to_string(),
+                description: "High hiring demand detected".to_string(),
+            });
+        }
+        if repo.social_score > 30.0 {
+            sigs.push(crate::models::Signal {
+                variant: "social".to_string(),
+                description: "Strong community momentum".to_string(),
+            });
+        }
+        repo.signals = sqlx::types::Json(sigs);
+    }
 
     Ok(Json(repos))
 }
@@ -177,6 +200,7 @@ pub async fn repo_detail(
             maintenance_score,
             trend_score,
             social_score,
+            hiring_score,
             updated_at
         FROM rankings
         WHERE repo_id = $1 AND timeframe_days = $2
@@ -358,6 +382,29 @@ async fn list_ranked_repositories(
         repos = fetch_all_time_fallback(pool, &query).await?;
     }
 
+    for repo in &mut repos {
+        let mut sigs = Vec::new();
+        if repo.stars_gained > 50 {
+            sigs.push(crate::models::Signal {
+                variant: "surge".to_string(),
+                description: format!("+{} stars in the past {} days", repo.stars_gained, repo.timeframe_days),
+            });
+        }
+        if repo.hiring_score > 30.0 {
+            sigs.push(crate::models::Signal {
+                variant: "enterprise".to_string(),
+                description: "High hiring demand detected".to_string(),
+            });
+        }
+        if repo.social_score > 30.0 {
+            sigs.push(crate::models::Signal {
+                variant: "social".to_string(),
+                description: "Strong community momentum".to_string(),
+            });
+        }
+        repo.signals = sqlx::types::Json(sigs);
+    }
+
     Ok(repos)
 }
 
@@ -429,17 +476,18 @@ async fn fetch_all_time_fallback(
             r.forks,
             30 as timeframe_days,
             0 as stars_gained,
-            0.0 as star_velocity,
-            0.0 as growth_ratio,
+            0.0::FLOAT as star_velocity,
+            0.0::FLOAT as growth_ratio,
             0 as contributors_gained,
-            0.0 as contributor_growth,
-            0.0 as velocity_score,
-            0.0 as growth_score,
-            0.0 as contributor_score,
-            0.0 as activity_score,
-            0.0 as maintenance_score,
+            0.0::FLOAT as contributor_growth,
+            0.0::FLOAT as velocity_score,
+            0.0::FLOAT as growth_score,
+            0.0::FLOAT as contributor_score,
+            0.0::FLOAT as activity_score,
+            0.0::FLOAT as maintenance_score,
             (r.stars::FLOAT) as trend_score,
-            0.0 as social_score,
+            0.0::FLOAT as social_score,
+            0.0::FLOAT as hiring_score,
             r.updated_at
         FROM repositories r
         WHERE r.stars >= 0
@@ -495,6 +543,7 @@ fn base_ranked_query() -> QueryBuilder<'static, Postgres> {
             rank.maintenance_score,
             rank.trend_score,
             rank.social_score,
+            rank.hiring_score,
             rank.updated_at
         FROM repositories r
         JOIN rankings rank ON rank.repo_id = r.id

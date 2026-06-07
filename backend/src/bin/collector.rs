@@ -97,6 +97,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    match discover_top_frameworks(&client).await {
+        Ok(top_repos) => {
+            repos_to_track.extend(top_repos);
+        }
+        Err(e) => {
+            tracing::error!("Failed to discover top frameworks: {}", e);
+        }
+    }
+
     // Remove duplicates just in case
     repos_to_track.sort();
     repos_to_track.dedup();
@@ -319,5 +328,41 @@ async fn discover_rising_repos(client: &reqwest::Client) -> Result<Vec<(String, 
     }
     
     tracing::info!("Found {} new rising projects!", discovered.len());
+    Ok(discovered)
+}
+
+async fn discover_top_frameworks(client: &reqwest::Client) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
+    let languages = vec!["rust", "go", "python", "javascript", "typescript", "java", "cpp", "ruby"];
+    let mut discovered = Vec::new();
+
+    for lang in languages {
+        let query = format!("language:{} stars:>1000", lang);
+        tracing::info!("Discovering top projects for {}...", lang);
+        
+        let resp = client.get("https://api.github.com/search/repositories")
+            .query(&[
+                ("q", query.as_str()),
+                ("sort", "stars"),
+                ("order", "desc"),
+                ("per_page", "65"),
+            ])
+            .send()
+            .await?;
+            
+        if !resp.status().is_success() {
+            tracing::error!("Failed to search GitHub for {}: {}", lang, resp.status());
+            continue;
+        }
+
+        let search_data: GithubSearchResponse = resp.json().await?;
+        for item in search_data.items {
+            discovered.push((item.owner.login, item.name));
+        }
+        
+        // Respect GitHub search API rate limits
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
+    
+    tracing::info!("Found {} top framework projects!", discovered.len());
     Ok(discovered)
 }

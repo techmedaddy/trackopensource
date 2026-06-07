@@ -37,11 +37,9 @@ async fn main() {
         manual_triggers: Arc::new(Mutex::new(Vec::new())),
     };
 
-    // Restrict CORS to known origins only
-    let allowed_origin = std::env::var("CORS_ORIGIN")
-        .unwrap_or_else(|_| "https://trackopensource.duckdns.org".to_string());
+    // Allow CORS for local development and production
     let cors = CorsLayer::new()
-        .allow_origin(allowed_origin.parse::<HeaderValue>().unwrap())
+        .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
 

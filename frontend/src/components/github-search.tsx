@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { compactNumber } from "@/lib/api";
 import { useAuth } from "@clerk/nextjs";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api";
+const API_BASE_URL = "/api";
 
 type GithubRepo = {
   id: number;

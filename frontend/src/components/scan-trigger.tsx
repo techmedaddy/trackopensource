@@ -16,7 +16,7 @@ export function ScanTrigger() {
 
     try {
       const token = await getToken();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"}/trigger`, {
+      const response = await fetch(`/api/trigger`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

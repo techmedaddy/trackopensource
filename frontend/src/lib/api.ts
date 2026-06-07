@@ -21,6 +21,8 @@ export type RankedRepository = {
   maintenanceScore: number;
   trendScore: number;
   socialScore: number;
+  hiringScore: number;
+  signals: { variant: string; description: string }[];
   updatedAt: string;
 };
 
@@ -65,6 +67,8 @@ export type Ranking = {
   maintenanceScore: number;
   trendScore: number;
   socialScore: number;
+  hiringScore: number;
+  signals: { variant: string; description: string }[];
   updatedAt: string;
 };
 

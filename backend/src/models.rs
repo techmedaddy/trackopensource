@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -50,6 +50,7 @@ pub struct Ranking {
     pub maintenance_score: f64,
     pub trend_score: f64,
     pub social_score: f64,
+    pub hiring_score: f64,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -78,6 +79,9 @@ pub struct RankedRepository {
     pub maintenance_score: f64,
     pub trend_score: f64,
     pub social_score: f64,
+    pub hiring_score: f64,
+    #[sqlx(default)]
+    pub signals: sqlx::types::Json<Vec<Signal>>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -110,4 +114,11 @@ pub struct RepositoryDetail {
 pub struct Facets {
     pub categories: Vec<String>,
     pub languages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Signal {
+    pub variant: String,
+    pub description: String,
 }
