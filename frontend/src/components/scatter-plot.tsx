@@ -10,13 +10,20 @@ import {
   Tooltip,
   ResponsiveContainer,
   ZAxis,
+  ReferenceArea,
   ReferenceLine,
   Cell,
 } from "recharts";
-import { useRouter } from "next/navigation";
 
-export function HypeVsHiringMatrix({ data }: { data: RankedRepository[] }) {
-  const router = useRouter();
+export function HypeVsHiringMatrix({
+  data,
+  activeCategory,
+  onSelectRepo,
+}: {
+  data: RankedRepository[];
+  activeCategory?: string | null;
+  onSelectRepo?: (id: string) => void;
+}) {
 
   const plotData = data.map((repo) => {
     // X-Axis (Hype): Mix of velocity and social momentum (computed on backend)
@@ -31,6 +38,8 @@ export function HypeVsHiringMatrix({ data }: { data: RankedRepository[] }) {
       hype: Math.round(hypeScore * 10) / 10,
       hiring: Math.round(hiringScore * 10) / 10,
       stars: repo.stars,
+      stars: repo.stars,
+      categories: repo.categories || [],
       // Color coding based on quadrant
       color: hiringScore > 30 && hypeScore > 30 ? "#10b981" : // Golden (Green)
              hypeScore > 30 && hiringScore <= 30 ? "#f59e0b" : // Speculative (Amber)
@@ -106,23 +115,40 @@ export function HypeVsHiringMatrix({ data }: { data: RankedRepository[] }) {
           />
           <ZAxis type="number" dataKey="stars" range={[40, 400]} />
           
-          <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '4 4', stroke: '#94a3b8', strokeWidth: 1.5 }} />
           
+          {/* Quadrant Backgrounds */}
+          <ReferenceArea x1={30} x2={100} y1={30} y2={100} fill="#10b981" fillOpacity={0.03} />
+          <ReferenceArea x1={30} x2={100} y1={0} y2={30} fill="#f59e0b" fillOpacity={0.03} />
+          <ReferenceArea x1={0} x2={30} y1={30} y2={100} fill="#3b82f6" fillOpacity={0.03} />
+          <ReferenceArea x1={0} x2={30} y1={0} y2={30} fill="#9ca3af" fillOpacity={0.03} />
+
           {/* Quadrant dividers */}
-          <ReferenceLine x={30} stroke="#e5e7eb" strokeWidth={2} />
-          <ReferenceLine y={30} stroke="#e5e7eb" strokeWidth={2} />
+          <ReferenceLine x={30} stroke="#cbd5e1" strokeDasharray="3 3" strokeWidth={1} />
+          <ReferenceLine y={30} stroke="#cbd5e1" strokeDasharray="3 3" strokeWidth={1} />
           
           <Scatter 
             name="Repositories" 
             data={plotData} 
             onClick={(e: any) => {
-              if (e && e.id) router.push(`/repos/${e.id}`);
+              if (e && e.id && onSelectRepo) onSelectRepo(e.id);
             }}
-            className="cursor-pointer transition-opacity hover:opacity-80"
+            className="cursor-pointer transition-opacity"
           >
-            {plotData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} stroke={entry.color} strokeWidth={1} />
-            ))}
+            {plotData.map((entry, index) => {
+              const matchesFilter = !activeCategory || entry.categories.includes(activeCategory);
+              const opacity = matchesFilter ? 0.8 : 0.1;
+              return (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={entry.color} 
+                  fillOpacity={opacity} 
+                  stroke={entry.color} 
+                  strokeOpacity={matchesFilter ? 1 : 0.2}
+                  strokeWidth={1} 
+                />
+              );
+            })}
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>

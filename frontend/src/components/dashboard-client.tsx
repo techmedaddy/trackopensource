@@ -8,6 +8,7 @@ import { useState } from "react";
 import { SearchPanel } from "@/components/search-panel";
 import { GithubSearchPanel } from "@/components/github-search";
 import { ScanTrigger } from "@/components/scan-trigger";
+import { RepoSideSheet } from "@/components/repo-side-sheet";
 import { HypeVsHiringMatrix } from "@/components/scatter-plot";
 import {
   compactNumber,
@@ -40,6 +41,7 @@ export function DashboardClient({
   const timeframeDays = ["7", "30", "90"].includes(windowStr) ? windowStr : "30";
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
 
   // Fetch available categories from the backend
   const { data: facets } = useSWR<{ categories: string[]; languages: string[] }>(
@@ -75,9 +77,9 @@ export function DashboardClient({
   );
 
   const { data: matrixData = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=50&timeframeDays=${timeframeDays}${categoryParam}`,
+    `/api/trending?limit=50&timeframeDays=${timeframeDays}`,
     fetcher,
-    { fallbackData: activeCategory ? undefined : initialTrending, keepPreviousData: true, refreshInterval: 60000 }
+    { fallbackData: initialTrending, keepPreviousData: true, refreshInterval: 60000 }
   );
 
   const leader = trending[0];
@@ -144,7 +146,7 @@ export function DashboardClient({
             subtitle="Visualize the gap between developer mindshare and corporate adoption."
           />
           <div className="flex-1 p-4 pt-0">
-            <HypeVsHiringMatrix data={matrixData} />
+            <HypeVsHiringMatrix data={matrixData} activeCategory={activeCategory} onSelectRepo={setSelectedRepoId} />
           </div>
         </div>
       </section>
@@ -159,7 +161,7 @@ export function DashboardClient({
             title="Trending repositories"
             subtitle="Ranked by the blended trend score."
           />
-          <RepositoryTable repos={trending} rankLabel="Trend" />
+          <RepositoryTable repos={trending} rankLabel="Trend" onSelectRepo={setSelectedRepoId} />
         </div>
 
         <div className="rounded-lg border border-neutral-200 bg-white shadow-sm">
@@ -171,7 +173,7 @@ export function DashboardClient({
             {fastestGrowing.length === 0 ? (
               <EmptyState />
             ) : (
-              fastestGrowing.map((repo) => <VelocityRow key={repo.id} repo={repo} />)
+              fastestGrowing.map((repo) => <VelocityRow key={repo.id} repo={repo} onSelectRepo={setSelectedRepoId} />)
             )}
           </div>
         </div>
@@ -189,10 +191,14 @@ export function DashboardClient({
               No rising projects yet. Add smaller repositories to the collector seed list.
             </div>
           ) : (
-            risingProjects.map((repo) => <RisingCard key={repo.id} repo={repo} />)
+            risingProjects.map((repo) => <RisingCard key={repo.id} repo={repo} onSelectRepo={setSelectedRepoId} />)
           )}
         </div>
       </section>
+
+      {selectedRepoId && (
+        <RepoSideSheet repoId={selectedRepoId} onClose={() => setSelectedRepoId(null)} />
+      )}
     </div>
   );
 }
@@ -200,10 +206,10 @@ export function DashboardClient({
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="min-w-24 rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-[0.14em] text-neutral-500">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
         {label}
       </div>
-      <div className="mt-1 text-xl font-semibold">{value}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-neutral-900">{value}</div>
     </div>
   );
 }
@@ -233,8 +239,8 @@ function SectionHeader({
   unframed?: boolean;
 }) {
   return (
-    <div className={unframed ? "mb-3" : "border-b border-neutral-200 px-5 py-4"}>
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <div className={unframed ? "mb-3" : "border-b border-neutral-200/60 px-5 py-4"}>
+      <h2 className="text-lg font-semibold tracking-tight text-neutral-900">{title}</h2>
       <p className="mt-1 text-sm text-neutral-500">{subtitle}</p>
     </div>
   );
@@ -243,9 +249,11 @@ function SectionHeader({
 function RepositoryTable({
   repos,
   rankLabel,
+  onSelectRepo,
 }: {
   repos: RankedRepository[];
   rankLabel: string;
+  onSelectRepo: (id: string) => void;
 }) {
   if (repos.length === 0) {
     return <EmptyState />;
@@ -268,9 +276,9 @@ function RepositoryTable({
             <tr key={repo.id} className="transition hover:bg-green-50/40">
               <td className="px-5 py-4 w-[30%]">
                 <div className="flex items-center gap-2">
-                  <Link href={`/repos/${repo.id}`} className="font-medium hover:text-green-700">
+                  <button onClick={() => onSelectRepo(repo.id)} className="font-medium text-left hover:text-emerald-700 transition">
                     {repoFullName(repo)}
-                  </Link>
+                  </button>
                 </div>
                 <p className="mt-1 line-clamp-1 text-neutral-500">
                   {repo.description ?? "No description available."}
@@ -303,11 +311,11 @@ function RepositoryTable({
                 </div>
               </td>
               <td className="px-5 py-4 w-[10%]">
-                <div className="font-medium">
+                <div className="font-medium tabular-nums">
                   {repo.starsGained >= 0 ? "+" : ""}
                   {compactNumber.format(repo.starsGained)}
                 </div>
-                <div className="text-xs text-neutral-500">
+                <div className="text-xs text-neutral-500 tabular-nums">
                   {repo.starVelocity.toFixed(1)} / day
                 </div>
               </td>
@@ -330,84 +338,58 @@ function MiniBar({ label, score, colorClass }: { label: string; score: number; c
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-neutral-100">
         <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${safeScore}%` }} />
       </div>
-      <span className="w-5 text-right font-medium text-neutral-700">{Math.round(safeScore)}</span>
+      <span className="w-5 text-right font-medium text-neutral-700 tabular-nums">{Math.round(safeScore)}</span>
     </div>
   );
 }
 
-function VelocityRow({ repo }: { repo: RankedRepository }) {
+function VelocityRow({ repo, onSelectRepo }: { repo: RankedRepository, onSelectRepo: (id: string) => void }) {
   return (
-    <Link
-      href={`/repos/${repo.id}`}
-      className="block px-5 py-4 transition hover:bg-green-50/40"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="font-medium">{repoFullName(repo)}</div>
-            <div className="hidden sm:flex items-center gap-1.5">
-              {repo.signals?.slice(0, 2).map((sig, idx) => (
-                <span key={idx} className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 border border-neutral-200 shadow-sm" title={sig.description}>
-                  <span>{sig.variant === "enterprise" ? "🏢" : sig.variant === "social" ? "💬" : "📈"}</span>
-                  <span>{sig.variant === "enterprise" ? "Hiring" : sig.variant === "social" ? "Social" : "Surge"}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="mt-1 text-sm text-neutral-500">{repo.language ?? "Unknown"}</div>
-        </div>
-        <div className="text-right">
-          <div className="font-semibold text-green-700">
-            {repo.starVelocity.toFixed(1)} / day
-          </div>
-          <div className="text-xs text-neutral-500">
-            {repo.starsGained >= 0 ? "+" : ""}
-            {compactNumber.format(repo.starsGained)} stars
-          </div>
+    <div className="group flex items-center justify-between px-5 py-4 transition hover:bg-neutral-50/50">
+      <div className="flex flex-col gap-1">
+        <button onClick={() => onSelectRepo(repo.id)} className="text-sm font-medium text-left hover:text-emerald-700 transition">
+          {repoFullName(repo)}
+        </button>
+        <div className="text-xs text-neutral-500">
+          {repo.language ?? "Unknown"} • {compactNumber.format(repo.stars)} stars
         </div>
       </div>
-    </Link>
+      <div className="text-right">
+        <div className="text-sm font-semibold text-emerald-600 tabular-nums">
+          +{compactNumber.format(repo.starsGained)} stars
+        </div>
+        <div className="text-xs text-neutral-500 tabular-nums">
+          {repo.starVelocity.toFixed(1)} / day
+        </div>
+      </div>
+    </div>
   );
 }
 
-function RisingCard({ repo }: { repo: RankedRepository }) {
+function RisingCard({ repo, onSelectRepo }: { repo: RankedRepository, onSelectRepo: (id: string) => void }) {
   return (
-    <Link
-      href={`/repos/${repo.id}`}
-      className="flex flex-col justify-between rounded-lg border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-green-500 hover:bg-green-50/50"
-    >
+    <div className="flex flex-col gap-3 rounded-xl border border-neutral-200/60 bg-white p-5 shadow-sm transition hover:shadow-md">
       <div>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-semibold">{repoFullName(repo)}</div>
-            <p className="mt-2 line-clamp-2 text-sm leading-6 text-neutral-500">
-              {repo.description ?? "No description available."}
-            </p>
-          </div>
-          <ScorePill score={repo.trendScore} />
+        <button
+          onClick={() => onSelectRepo(repo.id)}
+          className="text-base font-semibold text-left tracking-tight text-neutral-900 hover:text-emerald-700 transition"
+        >
+          {repo.name}
+        </button>
+        <div className="text-xs text-neutral-500">{repo.owner}</div>
+      </div>
+      <p className="line-clamp-2 text-sm text-neutral-600">
+        {repo.description ?? "No description provided."}
+      </p>
+      <div className="mt-auto flex items-center justify-between pt-2">
+        <div className="text-xs font-medium tabular-nums text-neutral-700">
+          {compactNumber.format(repo.stars)} ⭐
         </div>
-        
-        {repo.signals && repo.signals.length > 0 && (
-          <div className="mt-4 flex flex-col gap-1.5">
-            {repo.signals.map((sig, idx) => (
-              <div key={idx} className="flex items-center gap-1.5 text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded border border-neutral-100">
-                <span className="text-sm">{sig.variant === "enterprise" ? "🏢" : sig.variant === "social" ? "💬" : "📈"}</span>
-                <span className="line-clamp-1">{sig.description}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="text-xs font-semibold tabular-nums text-emerald-600">
+          +{compactNumber.format(repo.starsGained)} in {repo.timeframeDays}d
+        </div>
       </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-2 text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
-        <span className="rounded bg-neutral-100 px-2 py-1">
-          {compactNumber.format(repo.stars)} stars
-        </span>
-        <span className="rounded bg-neutral-100 px-2 py-1">
-          {repo.language ?? "Unknown"}
-        </span>
-      </div>
-    </Link>
+    </div>
   );
 }
 
