@@ -36,44 +36,7 @@ pub struct JobMention {
     pub posted_at: chrono::DateTime<Utc>,
 }
 
-pub fn get_aliases(repo_name: &str) -> Vec<String> {
-    let mut aliases = vec![repo_name.to_lowercase()];
-    
-    match repo_name.to_lowercase().as_str() {
-        "opentelemetry" | "opentelemetry-rust" | "opentelemetry-go" => {
-            aliases.extend(vec!["otel".to_string(), "opentelemetry".to_string()]);
-        }
-        "kubernetes" | "k8s" => {
-            aliases.extend(vec!["k8s".to_string(), "kubernetes".to_string()]);
-        }
-        "postgresql" | "postgres" => {
-            aliases.extend(vec!["postgres".to_string(), "postgresql".to_string(), "psql".to_string()]);
-        }
-        "react" | "reactjs" => {
-            aliases.extend(vec!["react".to_string(), "react.js".to_string()]);
-        }
-        "vue" | "vuejs" => {
-            aliases.extend(vec!["vue".to_string(), "vue.js".to_string()]);
-        }
-        "next.js" | "nextjs" | "next" => {
-            aliases.extend(vec!["next.js".to_string(), "nextjs".to_string()]);
-        }
-        "node" | "nodejs" => {
-            aliases.extend(vec!["nodejs".to_string(), "node.js".to_string()]);
-        }
-        "go" | "golang" => {
-            aliases.push("golang".to_string());
-        }
-        "rust" | "rustlang" => {
-            aliases.push("rustlang".to_string());
-        }
-        _ => {}
-    }
-    
-    aliases.sort();
-    aliases.dedup();
-    aliases
-}
+
 
 pub async fn scrape_hn_hiring_threads(
     client: &Client,
@@ -83,7 +46,7 @@ pub async fn scrape_hn_hiring_threads(
     let thread_url = "https://hn.algolia.com/api/v1/search?tags=story,author_whoishiring&query=\"Ask HN: Who is hiring?\"&hitsPerPage=2";
     let thread_resp = client.get(thread_url).send().await?.json::<HNStorySearchResponse>().await?;
 
-    let mut all_mentions = Vec::new();
+    let mut raw_inserts = 0;
 
     for story in &thread_resp.hits {
         tracing::info!("Scraping HN Hiring Thread: {}", story.object_id);
@@ -103,7 +66,7 @@ pub async fn scrape_hn_hiring_threads(
 
         for comment in comments_resp.hits {
             if let Some(text) = comment.comment_text {
-                let text_lower = text.to_lowercase();
+                let text_lower = text.clone();
                 
                 // Parse company & title from standard HN format
                 let first_line = text.lines().next().unwrap_or("");
@@ -137,55 +100,58 @@ pub async fn scrape_hn_hiring_threads(
 
                 let source_url = format!("https://news.ycombinator.com/item?id={}", comment.object_id);
 
-                // Check which repos are mentioned in this comment
-                for (repo_id, repo_name) in tracked_repos {
-                    let aliases = get_aliases(repo_name);
-                    let mut found = false;
-                    
-                    for alias in aliases {
-                        // Word boundary check to prevent "go" matching "algo"
-                        let padded_alias = format!(" {} ", alias);
-                        let text_padded = format!(" {} ", text_lower.replace(|c: char| !c.is_alphanumeric(), " "));
-                        
-                        if text_padded.contains(&padded_alias) {
-                            found = true;
-                            break;
-                        }
-                    }
+                // Insert raw post for tokenization
+                let result = sqlx::query(
+                    r#"
+                    INSERT INTO raw_job_posts (platform, external_id, company_name, job_title, content, source_url, posted_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    ON CONFLICT (external_id) DO NOTHING
+                    "#
+                )
+                .bind("hacker_news")
+                .bind(&comment.object_id)
+                .bind(&final_company)
+                .bind(&raw_title)
+                .bind(&text)
+                .bind(&source_url)
+                .bind(posted_at)
+                .execute(pool)
+                .await?;
 
-                    if found {
-                        all_mentions.push(JobMention {
-                            repo_id: *repo_id,
-                            company_name: final_company.clone(),
-                            job_title: raw_title.clone(),
-                            source_url: source_url.clone(),
-                            posted_at,
-                        });
-                    }
-                }
+                raw_inserts += result.rows_affected();
             }
         }
     }
 
-    tracing::info!("Found {} total job mentions across {} threads.", all_mentions.len(), thread_resp.hits.len());
+    tracing::info!("Inserted {} new raw job posts from {} HN threads.", raw_inserts, thread_resp.hits.len());
 
-    // Batch insert
-    for m in all_mentions {
-        sqlx::query(
-            r#"
-            INSERT INTO job_mentions (repo_id, company_name, job_title, source_url, posted_at)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT ON CONSTRAINT unique_job_mention DO NOTHING
-            "#,
-        )
-        .bind(m.repo_id)
-        .bind(&m.company_name)
-        .bind(m.job_title)
-        .bind(&m.source_url)
-        .bind(m.posted_at)
-        .execute(pool)
-        .await?;
-    }
+    // Execute the Alias Engine: PostgreSQL Full-Text Search Tokenization
+    // This replaces the in-memory substring ILIKE matching
+    let mapped_count = sqlx::query(
+        r#"
+        INSERT INTO job_mentions (repo_id, company_name, job_title, source_url, posted_at)
+        SELECT 
+            repo.id, 
+            raw.company_name, 
+            raw.job_title, 
+            raw.source_url, 
+            raw.posted_at
+        FROM raw_job_posts raw
+        CROSS JOIN repositories repo
+        WHERE 
+            EXISTS (
+                SELECT 1 FROM unnest(repo.aliases) AS alias 
+                WHERE to_tsvector('english', raw.content) @@ plainto_tsquery('english', alias)
+            )
+            AND array_length(repo.aliases, 1) > 0
+        ON CONFLICT ON CONSTRAINT unique_job_mention DO NOTHING;
+        "#
+    )
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    tracing::info!("Alias Engine mapped {} new repository mentions via tsvector tokenization.", mapped_count);
 
     Ok(())
 }

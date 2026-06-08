@@ -9,6 +9,7 @@ import { SearchPanel } from "@/components/search-panel";
 import { GithubSearchPanel } from "@/components/github-search";
 import { ScanTrigger } from "@/components/scan-trigger";
 import { RepoSideSheet } from "@/components/repo-side-sheet";
+import { CommandPalette } from "@/components/command-palette";
 import { HypeVsHiringMatrix } from "@/components/scatter-plot";
 import {
   compactNumber,
@@ -89,6 +90,7 @@ export function DashboardClient({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+      <CommandPalette onSelectRepo={setSelectedRepoId} />
       <header className="flex flex-col gap-4 border-b border-neutral-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Link href="/" className="group block w-fit">
@@ -105,7 +107,17 @@ export function DashboardClient({
           </p>
         </div>
         <div className="flex flex-col gap-3">
-          <div className="flex justify-end h-8">
+          <div className="flex justify-end items-center gap-3 h-8">
+            <button
+              onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+              className="group hidden sm:flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-500 hover:border-neutral-300 hover:text-neutral-900 shadow-sm transition-all"
+            >
+              <svg className="w-4 h-4 text-neutral-400 group-hover:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <span>Search</span>
+              <kbd className="ml-2 inline-flex items-center gap-1 font-sans text-[10px] font-medium text-neutral-400 bg-neutral-100 rounded px-1.5 py-0.5 group-hover:bg-neutral-200 transition-colors">
+                <span className="text-[10px]">⌘</span>K
+              </kbd>
+            </button>
             <Show when="signed-out">
               <SignInButton>
                 <button className="text-sm font-medium text-neutral-500 hover:text-neutral-900 transition">

@@ -38,7 +38,6 @@ export function HypeVsHiringMatrix({
       hype: Math.round(hypeScore * 10) / 10,
       hiring: Math.round(hiringScore * 10) / 10,
       stars: repo.stars,
-      stars: repo.stars,
       categories: repo.categories || [],
       // Color coding based on quadrant
       color: hiringScore > 30 && hypeScore > 30 ? "#10b981" : // Golden (Green)
