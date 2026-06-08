@@ -1,4 +1,4 @@
-use backend::{categorize::categorize_repo, hacker_news, reddit};
+use backend::{categorize::categorize_repo, hacker_news};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, LINK, USER_AGENT};
 use serde::Deserialize;
 use sqlx::postgres::PgPoolOptions;
@@ -226,16 +226,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
-                match backend::reddit::fetch_reddit_mentions(&client, repo_id, &owner, &name).await {
-                    Ok(mentions) => {
-                        if let Err(e) = backend::hacker_news::save_social_mentions(&pool, mentions).await {
-                            tracing::error!("Failed to save Reddit mentions for {}/{}: {}", owner, name, e);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, e);
-                    }
-                }
+
 
                 Some((repo_id, name))
             }

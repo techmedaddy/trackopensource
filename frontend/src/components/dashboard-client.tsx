@@ -1,10 +1,11 @@
 "use client";
 
-import { SignInButton, Show, UserButton } from "@clerk/nextjs";
+import { SignInButton, Show, UserButton, useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { getWatchlist } from "@/lib/api";
 import { SearchPanel } from "@/components/search-panel";
 import { GithubSearchPanel } from "@/components/github-search";
 import { ScanTrigger } from "@/components/scan-trigger";
@@ -43,6 +44,16 @@ export function DashboardClient({
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
+  const { isSignedIn, getToken } = useAuth();
+
+  const { data: watchlist = [] } = useSWR(
+    isSignedIn ? "watchlist" : null,
+    async () => {
+      const token = await getToken();
+      if (!token) return [];
+      return getWatchlist(token);
+    }
+  );
 
   // Fetch available categories from the backend
   const { data: facets } = useSWR<{ categories: string[]; languages: string[] }>(
@@ -66,7 +77,7 @@ export function DashboardClient({
   );
 
   const { data: fastestGrowing = [] } = useSWR<RankedRepository[]>(
-    `/api/fastest-growing?limit=8&timeframeDays=${timeframeDays}${categoryParam}`,
+    `/api/fastest-growing?limit=14&timeframeDays=${timeframeDays}${categoryParam}`,
     fetcher,
     { fallbackData: activeCategory ? undefined : initialFastest, keepPreviousData: true, refreshInterval: 60000 }
   );
@@ -126,6 +137,13 @@ export function DashboardClient({
               </SignInButton>
             </Show>
             <Show when="signed-in">
+              <Link 
+                href="/developer" 
+                className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                API
+              </Link>
               <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
             </Show>
           </div>
@@ -162,6 +180,24 @@ export function DashboardClient({
           </div>
         </div>
       </section>
+
+      {watchlist.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Your Tracked Projects</h2>
+            <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+              {watchlist.length}
+            </span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {matrixData
+              .filter(repo => watchlist.includes(repo.id))
+              .map(repo => (
+                <RisingCard key={repo.id} repo={repo} onSelectRepo={setSelectedRepoId} />
+              ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <GithubSearchPanel />

@@ -5,22 +5,12 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 #[derive(Deserialize, Debug)]
-struct RedditListing {
-    data: RedditData,
+struct PullpushResponse {
+    data: Vec<PullpushSubmission>,
 }
 
 #[derive(Deserialize, Debug)]
-struct RedditData {
-    children: Vec<RedditChild>,
-}
-
-#[derive(Deserialize, Debug)]
-struct RedditChild {
-    data: RedditPost,
-}
-
-#[derive(Deserialize, Debug)]
-struct RedditPost {
+struct PullpushSubmission {
     id: String,
     title: String,
     permalink: String,
@@ -35,23 +25,25 @@ pub async fn fetch_reddit_mentions(
     owner: &str,
     name: &str,
 ) -> Result<Vec<SocialMention>, Box<dyn std::error::Error>> {
+    // Pullpush is very strict about rate limits (approx 1 req/sec)
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
     let query = format!("github.com/{}/{}", owner, name);
-    let url = format!("https://www.reddit.com/search.json?q={}&sort=new&limit=50", query);
+    // Use Pullpush (Pushshift replacement) to bypass Reddit's 403 IP blocks
+    let url = format!("https://api.pullpush.io/reddit/search/submission/?q={}&size=50", query);
 
     let resp = client.get(&url)
-        .header(reqwest::header::USER_AGENT, "linux:opensource.radar:v1.0 (by /u/techmedaddy)")
         .send()
         .await?;
     
     if !resp.status().is_success() {
-        tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, resp.status());
+        tracing::error!("Failed to fetch Pullpush mentions for {}/{}: {}", owner, name, resp.status());
         return Ok(vec![]);
     }
 
-    let data: RedditListing = resp.json().await?;
+    let data: PullpushResponse = resp.json().await?;
 
-    let mentions = data.data.children.into_iter().map(|child| {
-        let post = child.data;
+    let mentions = data.data.into_iter().map(|post| {
         let published_at = DateTime::from_timestamp(post.created_utc as i64, 0)
             .unwrap_or_default();
         

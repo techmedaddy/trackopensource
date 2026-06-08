@@ -33,11 +33,14 @@ services:
       - CLERK_ISSUER=${CLERK_ISSUER}
       - CORS_ORIGIN=${CORS_ORIGIN}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - REDIS_URL=redis://redis:6379/0
     env_file:
       - .env
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -62,6 +65,15 @@ services:
       - backend
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -77,5 +89,6 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   caddy_data:
   caddy_config:

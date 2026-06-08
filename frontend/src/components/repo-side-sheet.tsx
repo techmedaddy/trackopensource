@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import { GrowthChart } from "@/components/growth-chart";
+import { WatchlistButton } from "@/components/watchlist-button";
 import {
   compactNumber,
   formatScore,
@@ -119,14 +120,17 @@ export function RepoSideSheet({
               </div>
             )}
             
-            <a
-              href={`https://github.com/${data.repository.owner}/${data.repository.name}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-neutral-950 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
-            >
-              Open on GitHub
-            </a>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <WatchlistButton repoId={data.repository.id} />
+              <a
+                href={`https://github.com/${data.repository.owner}/${data.repository.name}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex flex-1 items-center justify-center rounded-md bg-neutral-950 h-10 text-sm font-medium text-white transition hover:bg-neutral-800"
+              >
+                Open on GitHub
+              </a>
+            </div>
           </div>
         )}
       </div>

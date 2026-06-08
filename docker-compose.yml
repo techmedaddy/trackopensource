@@ -17,6 +17,13 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   backend:
     build:
       context: ./backend
@@ -31,6 +38,7 @@ services:
       - target_cache:/usr/src/app/target
     environment:
       - DATABASE_URL=postgres://postgres:password@db:5432/open_source_radar
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
@@ -49,9 +57,14 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8080/api
       - INTERNAL_API_URL=http://backend:8080/api
     depends_on:
+      - db
+      - redis
       - backend
 
 volumes:
   postgres_data:
+  redis_data:
   cargo_cache:
   target_cache:
+
+

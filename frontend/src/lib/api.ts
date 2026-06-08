@@ -52,6 +52,17 @@ export type Snapshot = {
   capturedAt: string;
 };
 
+export type RepositorySnapshot = {
+  id: string;
+  repoId: string;
+  stars: number;
+  forks: number;
+  socialScore: number;
+  hiringScore: number;
+  trendScore: number;
+  createdAt: string;
+};
+
 export type Ranking = {
   id: string;
   repoId: string;
@@ -77,6 +88,7 @@ export type RepositoryDetail = {
   repository: Repository;
   ranking: Ranking | null;
   snapshots: Snapshot[];
+  history: RepositorySnapshot[];
 };
 
 const API_BASE_URL =
@@ -131,4 +143,69 @@ export function formatScore(value: number) {
 
 export function repoFullName(repo: Pick<Repository, "owner" | "name">) {
   return `${repo.owner}/${repo.name}`;
+}
+
+export async function getWatchlist(token: string): Promise<string[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/watchlists`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (!response.ok) return [];
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleWatchlist(token: string, repoId: string, isTracked: boolean): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/watchlists/${repoId}`, {
+      method: isTracked ? "DELETE" : "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export type ApiKey = {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+
+export async function getApiKeys(token: string): Promise<ApiKey[]> {
+  const res = await fetch(`${API_BASE_URL}/keys`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to load keys");
+  return res.json();
+}
+
+export async function createApiKey(token: string, name: string): Promise<{ key: string; apiKey: ApiKey }> {
+  const res = await fetch(`${API_BASE_URL}/keys`, {
+    method: "POST",
+    headers: { 
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error("Failed to create key");
+  return res.json();
+}
+
+export async function revokeApiKey(token: string, id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/keys/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to revoke key");
 }

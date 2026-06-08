@@ -4,7 +4,7 @@ use crate::{
 };
 use axum::{
     body::Bytes,
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
@@ -19,6 +19,7 @@ use std::sync::{Arc, Mutex};
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
+    pub redis_pool: deadpool_redis::Pool,
     pub manual_triggers: Arc<Mutex<Vec<Instant>>>,
 }
 
@@ -216,7 +217,21 @@ pub async fn repo_detail(
         SELECT id, repo_id, stars, forks, watchers, open_issues, contributors, captured_at
         FROM snapshots
         WHERE repo_id = $1
-        ORDER BY captured_at
+        ORDER BY captured_at DESC
+        LIMIT 30
+        "#,
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let history = sqlx::query_as::<_, crate::models::RepositorySnapshot>(
+        r#"
+        SELECT id, repo_id, stars, forks, social_score, hiring_score, trend_score, created_at
+        FROM repository_snapshots
+        WHERE repo_id = $1
+        ORDER BY created_at ASC
+        LIMIT 30
         "#,
     )
     .bind(id)
@@ -227,6 +242,7 @@ pub async fn repo_detail(
         repository,
         ranking,
         snapshots,
+        history,
     }))
 }
 
@@ -629,5 +645,155 @@ pub async fn clerk_webhook(
         .await;
     }
 
+    Ok(StatusCode::OK)
+}
+
+pub async fn get_watchlist(
+    State(state): State<AppState>,
+    Extension(claims): Extension<crate::auth::Claims>,
+) -> AppResult<Json<Vec<Uuid>>> {
+    let list = sqlx::query_scalar::<_, Uuid>(
+        "SELECT repo_id FROM user_watchlists WHERE user_id = $1"
+    )
+    .bind(claims.sub)
+    .fetch_all(&state.pool)
+    .await?;
+    
+    Ok(Json(list))
+}
+
+pub async fn add_to_watchlist(
+    State(state): State<AppState>,
+    Extension(claims): Extension<crate::auth::Claims>,
+    Path(repo_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    sqlx::query(
+        "INSERT INTO user_watchlists (user_id, repo_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+    )
+    .bind(claims.sub)
+    .bind(repo_id)
+    .execute(&state.pool)
+    .await?;
+    
+    Ok(StatusCode::OK)
+}
+
+pub async fn remove_from_watchlist(
+    State(state): State<AppState>,
+    Extension(claims): Extension<crate::auth::Claims>,
+    Path(repo_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    sqlx::query(
+        "DELETE FROM user_watchlists WHERE user_id = $1 AND repo_id = $2"
+    )
+    .bind(claims.sub)
+    .bind(repo_id)
+    .execute(&state.pool)
+    .await?;
+    
+    Ok(StatusCode::OK)
+}
+
+use chrono::{DateTime, Utc};
+use sha2::{Digest, Sha256};
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
+
+#[derive(serde::Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKeyResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub prefix: String,
+    pub created_at: Option<DateTime<Utc>>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateApiKeyRequest {
+    pub name: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateApiKeyResponse {
+    pub key: String,
+    pub api_key: ApiKeyResponse,
+}
+
+pub async fn list_api_keys(
+    State(state): State<AppState>,
+    Extension(claims): Extension<crate::auth::Claims>,
+) -> AppResult<Json<Vec<ApiKeyResponse>>> {
+    let keys = sqlx::query_as::<_, ApiKeyResponse>(
+        r#"
+        SELECT id, name, prefix, created_at, last_used_at
+        FROM api_keys
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        "#
+    )
+    .bind(claims.sub)
+    .fetch_all(&state.pool)
+    .await?;
+    
+    Ok(Json(keys))
+}
+
+pub async fn create_api_key(
+    State(state): State<AppState>,
+    Extension(claims): Extension<crate::auth::Claims>,
+    Json(payload): Json<CreateApiKeyRequest>,
+) -> AppResult<Json<CreateApiKeyResponse>> {
+    let random_string: String = {
+        let mut rng = thread_rng();
+        (&mut rng).sample_iter(&Alphanumeric)
+            .take(32)
+            .map(char::from)
+            .collect()
+    };
+    
+    let full_key = format!("osr_{}", random_string);
+    
+    let mut hasher = Sha256::new();
+    hasher.update(full_key.as_bytes());
+    let key_hash = format!("{:x}", hasher.finalize());
+
+    let db_prefix: String = full_key.chars().take(8).collect();
+
+    let new_key = sqlx::query_as::<_, ApiKeyResponse>(
+        r#"
+        INSERT INTO api_keys (user_id, key_hash, prefix, name)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, name, prefix, created_at, last_used_at
+        "#
+    )
+    .bind(claims.sub)
+    .bind(key_hash)
+    .bind(db_prefix)
+    .bind(payload.name)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(CreateApiKeyResponse {
+        key: full_key,
+        api_key: new_key,
+    }))
+}
+
+pub async fn revoke_api_key(
+    State(state): State<AppState>,
+    Extension(claims): Extension<crate::auth::Claims>,
+    Path(key_id): Path<Uuid>,
+) -> AppResult<StatusCode> {
+    sqlx::query(
+        "DELETE FROM api_keys WHERE user_id = $1 AND id = $2"
+    )
+    .bind(claims.sub)
+    .bind(key_id)
+    .execute(&state.pool)
+    .await?;
+    
     Ok(StatusCode::OK)
 }

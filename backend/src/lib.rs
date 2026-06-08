@@ -8,3 +8,4 @@ pub mod reddit;
 pub mod jobs;
 pub mod auth;
 pub mod alerts;
+pub mod api_auth;

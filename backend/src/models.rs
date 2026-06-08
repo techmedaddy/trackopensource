@@ -108,6 +108,20 @@ pub struct RepositoryDetail {
     pub repository: Repository,
     pub ranking: Option<Ranking>,
     pub snapshots: Vec<Snapshot>,
+    pub history: Vec<RepositorySnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositorySnapshot {
+    pub id: Uuid,
+    pub repo_id: Uuid,
+    pub stars: i32,
+    pub forks: i32,
+    pub social_score: f64,
+    pub hiring_score: f64,
+    pub trend_score: f64,
+    pub created_at: chrono::NaiveDate,
 }
 
 #[derive(Debug, Serialize)]

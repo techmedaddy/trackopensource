@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { GrowthChart } from "@/components/growth-chart";
+import { RepositoryChart } from "@/components/repository-chart";
+import { WatchlistButton } from "@/components/watchlist-button";
 import {
   compactNumber,
   formatScore,
@@ -36,7 +37,7 @@ export default async function RepoPage({ params }: RepoPageProps) {
     );
   }
 
-  const { repository, ranking, snapshots } = detail;
+  const { repository, ranking, snapshots, history } = detail;
   const latestSnapshot = snapshots.at(-1);
 
   return (
@@ -61,14 +62,17 @@ export default async function RepoPage({ params }: RepoPageProps) {
                 ))}
               </div>
             </div>
-            <a
-              href={`https://github.com/${repository.owner}/${repository.name}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-neutral-950 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
-            >
-              View on GitHub
-            </a>
+            <div className="flex gap-2">
+              <WatchlistButton repoId={repository.id} />
+              <a
+                href={`https://github.com/${repository.owner}/${repository.name}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-neutral-950 px-4 text-sm font-medium text-white transition hover:bg-neutral-800"
+              >
+                View on GitHub
+              </a>
+            </div>
           </div>
         </header>
 
@@ -93,7 +97,7 @@ export default async function RepoPage({ params }: RepoPageProps) {
         <section className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
           <div>
             <SectionTitle title="Growth chart" subtitle="Stars, forks, and contributors over time." />
-            <GrowthChart snapshots={snapshots} />
+            <RepositoryChart history={history} />
           </div>
 
           <div className="rounded-lg border border-neutral-200 bg-white shadow-sm">

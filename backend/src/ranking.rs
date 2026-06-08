@@ -35,6 +35,8 @@ struct RawRanking {
     maintenance_score: f64,
     social_raw: f64,
     hiring_raw: f64,
+    current_stars: i32,
+    current_forks: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -211,6 +213,8 @@ fn build_raw_ranking(snapshots: &[Snapshot], timeframe_days: i32, social: Option
         maintenance_score: maintenance_score(latest),
         social_raw,
         hiring_raw,
+        current_stars: latest.stars,
+        current_forks: latest.forks,
     })
 }
 
@@ -311,6 +315,31 @@ async fn upsert_ranking(pool: &PgPool, ranking: ScoredRanking) -> Result<(), sql
     .bind(ranking.hiring_score)
     .execute(pool)
     .await?;
+
+    if ranking.raw.timeframe_days == 30 {
+        sqlx::query(
+            r#"
+            INSERT INTO repository_snapshots (
+                repo_id, stars, forks, social_score, hiring_score, trend_score, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE)
+            ON CONFLICT (repo_id, created_at)
+            DO UPDATE SET
+                stars = EXCLUDED.stars,
+                forks = EXCLUDED.forks,
+                social_score = EXCLUDED.social_score,
+                hiring_score = EXCLUDED.hiring_score,
+                trend_score = EXCLUDED.trend_score
+            "#,
+        )
+        .bind(ranking.raw.repo_id)
+        .bind(ranking.raw.current_stars)
+        .bind(ranking.raw.current_forks)
+        .bind(ranking.social_score)
+        .bind(ranking.hiring_score)
+        .bind(ranking.trend_score)
+        .execute(pool)
+        .await?;
+    }
 
     Ok(())
 }
