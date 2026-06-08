@@ -140,6 +140,8 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
     let scored_rankings = score_rankings(raw_rankings);
     let scored_count = scored_rankings.len();
 
+    let client = reqwest::Client::new();
+
     for ranking in scored_rankings {
         let repo_id = ranking.raw.repo_id;
         let timeframe_days = ranking.raw.timeframe_days;
@@ -152,6 +154,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
         if timeframe_days == 30 {
             crate::alerts::check_and_dispatch_alerts(
                 pool,
+                &client,
                 repo_id,
                 hiring_score,
                 social_score,

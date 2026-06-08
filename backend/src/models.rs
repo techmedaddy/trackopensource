@@ -79,6 +79,7 @@ pub struct RankedRepository {
     pub maintenance_score: f64,
     pub trend_score: f64,
     pub social_score: f64,
+    pub hype_score: f64,
     pub hiring_score: f64,
     #[sqlx(default)]
     pub signals: sqlx::types::Json<Vec<Signal>>,

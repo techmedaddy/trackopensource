@@ -19,8 +19,8 @@ export function HypeVsHiringMatrix({ data }: { data: RankedRepository[] }) {
   const router = useRouter();
 
   const plotData = data.map((repo) => {
-    // X-Axis (Hype): Mix of velocity and social momentum
-    const hypeScore = Math.min((repo.starVelocity * 5) + repo.socialScore, 100);
+    // X-Axis (Hype): Mix of velocity and social momentum (computed on backend)
+    const hypeScore = repo.hypeScore;
     // Y-Axis (Hiring): Corporate adoption
     const hiringScore = Math.min(repo.hiringScore, 100);
     

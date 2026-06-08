@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 pub async fn check_and_dispatch_alerts(
     pool: &PgPool,
+    client: &Client,
     repo_id: Uuid,
     hiring_score: f64,
     social_score: f64,
@@ -53,7 +54,14 @@ pub async fn check_and_dispatch_alerts(
     .await
     {
         Ok(Some(row)) => row,
-        _ => return, // Repo not found or DB error
+        Ok(None) => {
+            tracing::warn!("Alert evaluation skipped: Repo ID {} not found", repo_id);
+            return;
+        }
+        Err(e) => {
+            tracing::error!("Database query error during alert evaluation: {}", e);
+            return;
+        }
     };
 
     use sqlx::Row;
@@ -86,7 +94,6 @@ pub async fn check_and_dispatch_alerts(
         }]
     });
 
-    let client = Client::new();
     match client.post(&webhook_url).json(&payload).send().await {
         Ok(resp) => {
             if resp.status().is_success() {
