@@ -51,9 +51,9 @@ export function RepositoryChart({ history }: RepositoryChartProps) {
         mockData.push({
           date: dateFormatter.format(d),
           Stars: currentStars,
-          "Hiring Score": Math.max(0, currentHiring).toFixed(1),
-          "Social Score": (currentTrend * 1.5).toFixed(1),
-          "Trend Score": Math.max(0, currentTrend).toFixed(1),
+          "Hiring Score": Number(Math.max(0, currentHiring).toFixed(1)),
+          "Social Score": Number((currentTrend * 1.5).toFixed(1)),
+          "Trend Score": Number(Math.max(0, currentTrend).toFixed(1)),
         });
       }
       return mockData;
