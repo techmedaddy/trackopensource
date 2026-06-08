@@ -11,13 +11,14 @@ pub async fn check_and_dispatch_alerts(
     hiring_score: f64,
     social_score: f64,
     trend_score: f64,
+    hype_score: f64,
 ) {
     let webhook_url = env::var("DISCORD_WEBHOOK_URL").unwrap_or_default();
     if webhook_url.is_empty() {
         return; // No webhook configured
     }
 
-    let is_golden_zone = hiring_score > 30.0 && social_score > 30.0;
+    let is_golden_zone = hiring_score > 30.0 && hype_score > 30.0;
     let is_breakout = trend_score > 15.0; // High threshold for general momentum breakout
 
     let alert_type = if is_golden_zone {

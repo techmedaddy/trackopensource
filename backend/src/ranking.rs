@@ -148,6 +148,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
         let hiring_score = ranking.hiring_score;
         let social_score = ranking.social_score;
         let trend_score = ranking.trend_score;
+        let hype_score = (ranking.velocity_score * 0.5) + (social_score * 0.5);
 
         upsert_ranking(pool, ranking).await?;
 
@@ -159,6 +160,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
                 hiring_score,
                 social_score,
                 trend_score,
+                hype_score,
             ).await;
         }
     }

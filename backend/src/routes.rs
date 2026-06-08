@@ -544,7 +544,7 @@ fn base_ranked_query() -> QueryBuilder<'static, Postgres> {
             rank.maintenance_score,
             rank.trend_score,
             rank.social_score,
-            LEAST((rank.star_velocity * 5) + rank.social_score, 100.0)::FLOAT as hype_score,
+            (rank.velocity_score * 0.5 + rank.social_score * 0.5)::FLOAT as hype_score,
             rank.hiring_score,
             rank.updated_at
         FROM repositories r
