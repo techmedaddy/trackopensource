@@ -11,6 +11,8 @@ import { GithubSearchPanel } from "@/components/github-search";
 import { ScanTrigger } from "@/components/scan-trigger";
 import { RepoSideSheet } from "@/components/repo-side-sheet";
 import { CommandPalette } from "@/components/command-palette";
+import { TopGainersWidget } from "@/components/top-gainers-widget";
+import { PersonaAnalyzer } from "@/components/persona-analyzer";
 import { HypeVsHiringMatrix } from "@/components/scatter-plot";
 import {
   compactNumber,
@@ -44,6 +46,7 @@ export function DashboardClient({
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
+  const [showCanvas, setShowCanvas] = useState(false);
   const { isSignedIn, getToken } = useAuth();
 
   const { data: watchlist = [] } = useSWR(
@@ -138,6 +141,13 @@ export function DashboardClient({
             </Show>
             <Show when="signed-in">
               <Link 
+                href="/docs" 
+                className="hidden sm:flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                Docs
+              </Link>
+              <Link 
                 href="/developer" 
                 className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-sm"
               >
@@ -147,7 +157,7 @@ export function DashboardClient({
               <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
             </Show>
           </div>
-          <div className="grid grid-cols-4 gap-3 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <Metric label="Tracked" value={trackedCount || 0} />
             <WindowSelector currentWindow={timeframeDays} />
             <Metric
@@ -159,6 +169,8 @@ export function DashboardClient({
         </div>
       </header>
 
+      <TopGainersWidget repositories={fastestGrowing} onSelectRepo={setSelectedRepoId} />
+
       <CategoryFilter
         categories={facets?.categories ?? []}
         activeCategory={activeCategory}
@@ -167,19 +179,36 @@ export function DashboardClient({
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="flex flex-col h-full">
-          <SearchPanel initialResults={trending.slice(0, 4)} />
+          <SearchPanel initialResults={trending.slice(0, 4)} onSelectRepo={setSelectedRepoId} />
         </div>
 
         <div className="flex flex-col rounded-lg border border-neutral-200 bg-white shadow-sm h-full">
-          <SectionHeader
-            title="Hype vs. Hiring Matrix"
-            subtitle="Visualize the gap between developer mindshare and corporate adoption."
-          />
+          <div className="flex items-center justify-between pr-4">
+            <SectionHeader
+              title="Hype vs. Hiring Matrix"
+              subtitle={showCanvas ? "Personal Canvas: Only showing your tracked repositories." : "Visualize the gap between developer mindshare and corporate adoption."}
+            />
+            {isSignedIn && watchlist.length > 0 && (
+              <label className="flex items-center gap-2 cursor-pointer pt-6">
+                <span className="text-sm font-medium text-neutral-600">My Canvas</span>
+                <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showCanvas ? 'bg-indigo-600' : 'bg-neutral-300'}`}>
+                  <input type="checkbox" className="sr-only" checked={showCanvas} onChange={() => setShowCanvas(!showCanvas)} />
+                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showCanvas ? 'translate-x-5' : 'translate-x-1'}`} />
+                </div>
+              </label>
+            )}
+          </div>
           <div className="flex-1 p-4 pt-0">
-            <HypeVsHiringMatrix data={matrixData} activeCategory={activeCategory} onSelectRepo={setSelectedRepoId} />
+            <HypeVsHiringMatrix 
+              data={showCanvas ? matrixData.filter(repo => watchlist.includes(repo.id)) : matrixData} 
+              activeCategory={activeCategory} 
+              onSelectRepo={setSelectedRepoId} 
+            />
           </div>
         </div>
       </section>
+
+      <PersonaAnalyzer />
 
       {watchlist.length > 0 && (
         <section>
@@ -321,12 +350,12 @@ function RepositoryTable({
         </thead>
         <tbody className="divide-y divide-neutral-200">
           {repos.map((repo) => (
-            <tr key={repo.id} className="transition hover:bg-green-50/40">
+            <tr key={repo.id} onClick={() => onSelectRepo(repo.id)} className="transition hover:bg-green-50/40 cursor-pointer group">
               <td className="px-5 py-4 w-[30%]">
                 <div className="flex items-center gap-2">
-                  <button onClick={() => onSelectRepo(repo.id)} className="font-medium text-left hover:text-emerald-700 transition">
+                  <span className="font-medium text-left group-hover:text-emerald-700 transition">
                     {repoFullName(repo)}
-                  </button>
+                  </span>
                 </div>
                 <p className="mt-1 line-clamp-1 text-neutral-500">
                   {repo.description ?? "No description available."}
@@ -393,11 +422,11 @@ function MiniBar({ label, score, colorClass }: { label: string; score: number; c
 
 function VelocityRow({ repo, onSelectRepo }: { repo: RankedRepository, onSelectRepo: (id: string) => void }) {
   return (
-    <div className="group flex items-center justify-between px-5 py-4 transition hover:bg-neutral-50/50">
+    <div onClick={() => onSelectRepo(repo.id)} className="group flex items-center justify-between px-5 py-4 transition hover:bg-neutral-50/50 cursor-pointer">
       <div className="flex flex-col gap-1">
-        <button onClick={() => onSelectRepo(repo.id)} className="text-sm font-medium text-left hover:text-emerald-700 transition">
+        <span className="text-sm font-medium text-left group-hover:text-emerald-700 transition">
           {repoFullName(repo)}
-        </button>
+        </span>
         <div className="text-xs text-neutral-500">
           {repo.language ?? "Unknown"} • {compactNumber.format(repo.stars)} stars
         </div>
@@ -416,14 +445,11 @@ function VelocityRow({ repo, onSelectRepo }: { repo: RankedRepository, onSelectR
 
 function RisingCard({ repo, onSelectRepo }: { repo: RankedRepository, onSelectRepo: (id: string) => void }) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-neutral-200/60 bg-white p-5 shadow-sm transition hover:shadow-md">
+    <button onClick={() => onSelectRepo(repo.id)} className="group flex flex-col gap-3 rounded-xl border border-neutral-200/60 bg-white p-5 shadow-sm transition hover:shadow-md cursor-pointer hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left">
       <div>
-        <button
-          onClick={() => onSelectRepo(repo.id)}
-          className="text-base font-semibold text-left tracking-tight text-neutral-900 hover:text-emerald-700 transition"
-        >
+        <span className="text-base font-semibold tracking-tight text-neutral-900 group-hover:text-emerald-700 transition">
           {repo.name}
-        </button>
+        </span>
         <div className="text-xs text-neutral-500">{repo.owner}</div>
       </div>
       <p className="line-clamp-2 text-sm text-neutral-600">
@@ -437,7 +463,7 @@ function RisingCard({ repo, onSelectRepo }: { repo: RankedRepository, onSelectRe
           +{compactNumber.format(repo.starsGained)} in {repo.timeframeDays}d
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

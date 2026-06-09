@@ -72,9 +72,12 @@ export function RepoSideSheet({
         {data && (
           <div className="flex flex-col gap-8 p-6">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {repoFullName(data.repository)}
-              </h1>
+              <div className="flex items-center justify-between gap-4">
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  {repoFullName(data.repository)}
+                </h1>
+                <WatchlistButton repoId={repoId} />
+              </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-600">
                 {data.repository.description ?? "No description available."}
               </p>

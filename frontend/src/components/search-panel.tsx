@@ -13,9 +13,10 @@ const API_BASE_URL = "/api";
 
 type SearchPanelProps = {
   initialResults: RankedRepository[];
+  onSelectRepo: (id: string) => void;
 };
 
-export function SearchPanel({ initialResults }: SearchPanelProps) {
+export function SearchPanel({ initialResults, onSelectRepo }: SearchPanelProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(initialResults);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,14 +90,14 @@ export function SearchPanel({ initialResults }: SearchPanelProps) {
           </div>
         ) : (
           results.map((repo) => (
-            <Link
+            <button
               key={repo.id}
-              href={`/repos/${repo.id}`}
-              className="rounded-md border border-neutral-200 p-4 transition hover:border-green-500 hover:bg-green-50/50"
+              onClick={() => onSelectRepo(repo.id)}
+              className="rounded-md border border-neutral-200 p-4 transition hover:border-green-500 hover:bg-green-50/50 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-green-500 group"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-medium text-neutral-950">{repoFullName(repo)}</div>
+                  <div className="font-medium text-neutral-950 group-hover:text-emerald-700 transition">{repoFullName(repo)}</div>
                   <div className="mt-1 line-clamp-2 text-sm text-neutral-500">
                     {repo.description ?? "No description available."}
                   </div>
@@ -110,7 +111,7 @@ export function SearchPanel({ initialResults }: SearchPanelProps) {
                 <span>{repo.starsGained >= 0 ? "+" : ""}{compactNumber.format(repo.starsGained)} in {repo.timeframeDays}d</span>
                 {repo.language ? <span>{repo.language}</span> : null}
               </div>
-            </Link>
+            </button>
           ))
         )}
       </div>
