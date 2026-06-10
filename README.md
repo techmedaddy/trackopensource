@@ -6,6 +6,13 @@ While total star counts are easy to find, understanding whether a hyped framewor
 
 <img width="1024" height="1024" alt="track" src="https://github.com/user-attachments/assets/87d9e3ca-da00-4de9-a094-338a66123b65" />
 
+## Current Status (V1 Pre-Launch)
+
+* **Clean Slate Production:** The production database has been wiped clean of all mock/prototype data. The system is currently in a pristine state, ready for the `collector` job to ingest real-world repository metrics.
+* **Authentication:** Integrated with Clerk to handle user sessions and provide a personalized "My Canvas" view for tracking specific repositories.
+* **Documentation:** The `/docs` portal is currently a placeholder ("Coming Soon") and will be populated upon the official V1 launch.
+* **UI Modules:** Components like the Top Gainers Widget and Live Ticker are active but will remain hidden or dormant until the first batches of historical data populate the database and register measurable growth.
+
 ## Features
 
 * **Hype vs. Hiring Matrix:** A 2x2 scatter plot visualizing the gap between developer mindshare (velocity, stars, social buzz) and corporate adoption (job mentions). Spots "Golden Zone" frameworks vs. "Speculative" tech.
@@ -51,12 +58,20 @@ The easiest way to run the entire stack locally is using Docker Compose.
     DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
     ```
 
-3.  Build and start the development containers:
+3.  Create a `.env.local` file inside the `frontend/` directory for Clerk authentication:
+    ```env
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+    CLERK_SECRET_KEY=sk_test_...
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+    NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+    ```
+
+4.  Build and start the development containers:
     ```bash
     docker compose up --build -d
     ```
 
-4.  Seed the database by executing the collector and ranker commands inside the running backend container:
+5.  Seed the database by executing the collector and ranker commands inside the running backend container:
     ```bash
     # Run the ingestion pipeline (fetches GitHub stats and Social Signals)
     docker compose exec backend cargo run --bin collector
