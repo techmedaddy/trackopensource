@@ -4,8 +4,7 @@ Open Source Career Radar is a specialized analytics dashboard that discovers Git
 
 While total star counts are easy to find, understanding whether a hyped framework will actually get you a job is much harder. This project tracks repository growth metrics and combines them with social signals (Hacker News job mentions, Reddit discussions) to surface a **Hype vs. Hiring Matrix**, helping engineers choose technologies that offer both momentum and career stability.
 
-<img width="1024" height="1024" alt="track" src="https://github.com/user-attachments/assets/87d9e3ca-da00-4de9-a094-338a66123b65" />
-
+![alt text](image.png)
 ## Current Status (V1 Pre-Launch)
 
 * **Clean Slate Production:** The production database has been wiped clean of all mock/prototype data. The system is currently in a pristine state, ready for the `collector` job to ingest real-world repository metrics.
