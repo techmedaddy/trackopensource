@@ -1,6 +1,6 @@
-# Open Source Career Radar
+# TRACKOPENSOURCE
 
-Open Source Career Radar is a specialized analytics dashboard that discovers GitHub repositories growing faster than expected, and juxtaposes their developer mindshare against real-world enterprise hiring demand.
+TRACKOPENSOURCE is a specialized analytics dashboard that discovers GitHub repositories growing faster than expected, and juxtaposes their developer mindshare against real-world enterprise hiring demand.
 
 While total star counts are easy to find, understanding whether a hyped framework will actually get you a job is much harder. This project tracks repository growth metrics and combines them with social signals (Hacker News job mentions, Reddit discussions) to surface a **Hype vs. Hiring Matrix**, helping engineers choose technologies that offer both momentum and career stability.
 
