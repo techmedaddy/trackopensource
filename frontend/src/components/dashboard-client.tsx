@@ -492,18 +492,36 @@ function EmptyState() {
   );
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  "AI": "🤖",
-  "Backend": "⚙️",
-  "Database": "🗄️",
-  "DevOps": "🔧",
-  "Frontend": "🎨",
-  "Go": "🐹",
-  "Infrastructure": "☁️",
-  "Python": "🐍",
-  "Rust": "🦀",
-  "Security": "🔒",
-};
+function CategoryIcon({ cat }: { cat: string }) {
+  const getSimpleIcon = (name: string) => (
+    <img src={`https://cdn.simpleicons.org/${name}`} alt={cat} className="w-3.5 h-3.5 mr-1.5" />
+  );
+
+  switch (cat) {
+    // Domains
+    case "AI": return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 mr-1.5 text-blue-500"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>;
+    case "Backend": return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 mr-1.5 text-neutral-500"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>;
+    case "Database": return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 mr-1.5 text-indigo-500"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>;
+    case "DevOps": return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 mr-1.5 text-purple-500"><path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.33-6 4Z"/></svg>;
+    case "Frontend": return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 mr-1.5 text-pink-500"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="9" x2="9" y1="21" y2="9"/></svg>;
+    case "Infrastructure": return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 mr-1.5 text-sky-500"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>;
+    case "Security": return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 mr-1.5 text-emerald-500"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+    
+    // Languages
+    case "C": return getSimpleIcon("c");
+    case "C++": return getSimpleIcon("cplusplus");
+    case "Go": return getSimpleIcon("go");
+    case "Java": return getSimpleIcon("openjdk");
+    case "JavaScript": return getSimpleIcon("javascript");
+    case "Python": return getSimpleIcon("python");
+    case "Ruby": return getSimpleIcon("ruby");
+    case "Rust": return getSimpleIcon("rust");
+    case "TypeScript": return getSimpleIcon("typescript");
+    
+    // Default fallback
+    default: return null;
+  }
+}
 
 function CategoryFilter({
   categories,
@@ -533,13 +551,14 @@ function CategoryFilter({
         <button
           key={cat}
           onClick={() => onSelect(activeCategory === cat ? null : cat)}
-          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+          className={`flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
             activeCategory === cat
               ? "bg-green-600 text-white shadow-sm"
               : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
           }`}
         >
-          {CATEGORY_ICONS[cat] ?? "📦"} {cat}
+          <CategoryIcon cat={cat} />
+          {cat}
         </button>
       ))}
     </div>
