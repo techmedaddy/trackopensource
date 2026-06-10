@@ -14,7 +14,7 @@ export default async function Home(props: { searchParams: SearchParams }) {
   const [trending, fastestGrowing, risingProjects] = await Promise.all([
     getRankedRepositories(`/trending?limit=10&timeframeDays=${timeframeDays}`),
     getRankedRepositories(`/fastest-growing?limit=14&timeframeDays=${timeframeDays}`),
-    getRankedRepositories(`/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=1000`),
+    getRankedRepositories(`/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=100`),
   ]);
 
   return (

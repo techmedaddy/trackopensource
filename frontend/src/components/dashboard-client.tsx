@@ -86,7 +86,7 @@ export function DashboardClient({
   );
 
   const { data: risingProjects = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=1000${categoryParam}`,
+    `/api/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=100${categoryParam}`,
     fetcher,
     { fallbackData: activeCategory ? undefined : initialRising, keepPreviousData: true, refreshInterval: 60000 }
   );
@@ -268,7 +268,14 @@ export function DashboardClient({
       <section>
         <SectionHeader
           title="New rising projects"
-          subtitle="Repositories under 1,000 stars with unusual momentum."
+          subtitle={
+            <span className="flex items-center gap-1.5">
+              <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">Sponsored</span>
+              <a href="https://github.com/techmedaddy/TorrentEdge" target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 hover:underline font-medium">
+                TorrentEdge: Cloud-Native, Peer-Assisted Artifact Distribution
+              </a>
+            </span>
+          }
           unframed
         />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -321,7 +328,7 @@ function SectionHeader({
   unframed = false,
 }: {
   title: string;
-  subtitle: string;
+  subtitle: React.ReactNode;
   unframed?: boolean;
 }) {
   return (

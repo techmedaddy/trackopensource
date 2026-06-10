@@ -87,13 +87,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Discovery Phase: Find hidden gems & explosive new projects
-    // We search for repositories created in the last 60 days that have gained at least 30 stars.
-    match discover_rising_repos(&client).await {
+    // Uses Time-Bounded Velocity Windowing to extract anomalous micro-gems
+    match discover_unusual_momentum_repos(&client).await {
         Ok(new_repos) => {
             repos_to_track.extend(new_repos);
         }
         Err(e) => {
-            tracing::error!("Failed to discover new repos: {}", e);
+            tracing::error!("Failed to discover new momentum repos: {}", e);
         }
     }
 
@@ -283,36 +283,50 @@ fn parse_last_page(link_header: &str) -> Option<i32> {
         })
 }
 
-async fn discover_rising_repos(client: &reqwest::Client) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
-    // Look for repositories created in the last 60 days that have gained at least 30 stars.
-    let cutoff_date = (chrono::Utc::now() - chrono::Duration::days(60)).format("%Y-%m-%d").to_string();
-    let query = format!("created:>{} stars:>30", cutoff_date);
+async fn discover_unusual_momentum_repos(client: &reqwest::Client) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
+    let mut discovered = Vec::new();
     
-    tracing::info!("Discovering new rising projects created after {}...", cutoff_date);
+    // Bucket 1: The Hour-Zero Spike (Created in last 48h, stars between 15 and 100)
+    let format_48h = (chrono::Utc::now() - chrono::Duration::days(2)).format("%Y-%m-%d").to_string();
+    let query_48h = format!("created:>{} stars:15..100", format_48h);
     
-    let resp = client.get("https://api.github.com/search/repositories")
-        .query(&[
-            ("q", query.as_str()),
-            ("sort", "stars"),
-            ("order", "desc"),
-            ("per_page", "40"), // Fetch top 40 new trending projects
-        ])
-        .send()
-        .await?;
+    // Bucket 2: The Weekly Breakout (Created in last 7 days, stars between 35 and 250)
+    let format_7d = (chrono::Utc::now() - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+    let query_7d = format!("created:>{} stars:35..250", format_7d);
+
+    let target_queries = vec![
+        ("hour_zero", query_48h),
+        ("weekly_breakout", query_7d)
+    ];
+
+    for (bucket_name, query_string) in target_queries {
+        tracing::info!("Scanning velocity bucket [{}] with query: {}", bucket_name, query_string);
         
-    if !resp.status().is_success() {
-        tracing::error!("Failed to search GitHub: {}", resp.status());
-        return Ok(vec![]);
+        let resp = client.get("https://api.github.com/search/repositories")
+            .query(&[
+                ("q", query_string.as_str()),
+                ("sort", "stars"),
+                ("order", "desc"),
+                ("per_page", "30"), // Fetch top 30 per velocity bucket
+            ])
+            .send()
+            .await?;
+            
+        if !resp.status().is_success() {
+            tracing::error!("GitHub velocity search failed for [{}]: {}", bucket_name, resp.status());
+            continue;
+        }
+
+        let search_data: GithubSearchResponse = resp.json().await?;
+        for item in search_data.items {
+            discovered.push((item.owner.login, item.name));
+        }
+
+        // Standard rate-limit safety pause between search buckets
+        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     }
 
-    let search_data: GithubSearchResponse = resp.json().await?;
-    
-    let mut discovered = Vec::new();
-    for item in search_data.items {
-        discovered.push((item.owner.login, item.name));
-    }
-    
-    tracing::info!("Found {} new rising projects!", discovered.len());
+    tracing::info!("Velocity scanning complete. Unearthed {} momentum assets.", discovered.len());
     Ok(discovered)
 }
 
