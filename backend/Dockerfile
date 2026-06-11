@@ -11,6 +11,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin backend
 RUN cargo build --release --bin collector
 RUN cargo build --release --bin ranker
+RUN cargo build --release --bin worker
 
 FROM debian:bookworm-slim
 
@@ -26,6 +27,7 @@ RUN groupadd --gid 1001 appuser && \
 COPY --from=builder /usr/src/app/target/release/backend /usr/local/bin/backend
 COPY --from=builder /usr/src/app/target/release/collector /usr/local/bin/collector
 COPY --from=builder /usr/src/app/target/release/ranker /usr/local/bin/ranker
+COPY --from=builder /usr/src/app/target/release/worker /usr/local/bin/worker
 
 # Copy migrations so they can be run on startup if needed
 COPY --from=builder /usr/src/app/migrations ./migrations
