@@ -31,6 +31,11 @@ pub struct RankingQuery {
     pub language: Option<String>,
     pub category: Option<String>,
     pub max_stars: Option<i32>,
+    pub vw: Option<f64>,
+    pub gw: Option<f64>,
+    pub cw: Option<f64>,
+    pub hw: Option<f64>,
+    pub sw: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +106,11 @@ pub async fn search(
                 language: None,
                 category: None,
                 max_stars: None,
+                vw: None,
+                gw: None,
+                cw: None,
+                hw: None,
+                sw: None,
             },
             SortMode::Trend,
         )
@@ -112,7 +122,14 @@ pub async fn search(
     let limit = valid_limit(query.limit);
     let pattern = format!("%{}%", trimmed);
 
-    let mut builder = base_ranked_query();
+    let default_weights = crate::models::RankingWeights {
+        velocity_weight: 0.5,
+        growth_weight: 0.2,
+        contributor_weight: 0.1,
+        hiring_weight: 0.1,
+        social_weight: 0.1,
+    };
+    let mut builder = base_ranked_query(&default_weights);
     builder
         .push(" WHERE rank.timeframe_days = ")
         .push_bind(timeframe_days)
@@ -341,19 +358,40 @@ async fn list_ranked_repositories(
 ) -> Result<Vec<RankedRepository>, sqlx::Error> {
     let mut current_timeframe = valid_timeframe(query.timeframe_days);
 
+    let mut weights = crate::models::RankingWeights {
+        velocity_weight: 0.5,
+        growth_weight: 0.2,
+        contributor_weight: 0.1,
+        hiring_weight: 0.1,
+        social_weight: 0.1,
+    };
+
+    if let (Some(vw), Some(gw), Some(cw), Some(hw), Some(sw)) = (query.vw, query.gw, query.cw, query.hw, query.sw) {
+        let custom_weights = crate::models::RankingWeights {
+            velocity_weight: vw,
+            growth_weight: gw,
+            contributor_weight: cw,
+            hiring_weight: hw,
+            social_weight: sw,
+        };
+        if custom_weights.validate() {
+            weights = custom_weights;
+        }
+    }
+
     // 1. Try the requested timeframe
-    let mut repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe).await?;
+    let mut repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe, &weights).await?;
 
     // 2. Fallback to 30 days if 90 days is empty
     if repos.is_empty() && current_timeframe == 90 {
         current_timeframe = 30;
-        repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe).await?;
+        repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe, &weights).await?;
     }
 
     // 3. Fallback to 7 days if 30 days is empty
     if repos.is_empty() && current_timeframe == 30 {
         current_timeframe = 7;
-        repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe).await?;
+        repos = fetch_with_timeframe(pool, &query, &sort_mode, current_timeframe, &weights).await?;
     }
 
     // 4. Ultimate Fallback: If STILL empty, just return top repositories by raw stars
@@ -393,10 +431,11 @@ async fn fetch_with_timeframe(
     query: &RankingQuery,
     sort_mode: &SortMode,
     timeframe_days: i32,
+    weights: &crate::models::RankingWeights,
 ) -> Result<Vec<RankedRepository>, sqlx::Error> {
     let limit = valid_limit(query.limit);
 
-    let mut builder = base_ranked_query();
+    let mut builder = base_ranked_query(weights);
     builder
         .push(" WHERE rank.timeframe_days = ")
         .push_bind(timeframe_days);
@@ -498,8 +537,8 @@ async fn fetch_all_time_fallback(
     builder.build_query_as::<RankedRepository>().fetch_all(pool).await
 }
 
-fn base_ranked_query() -> QueryBuilder<'static, Postgres> {
-    QueryBuilder::new(
+fn base_ranked_query(weights: &crate::models::RankingWeights) -> QueryBuilder<'static, Postgres> {
+    let mut qb = QueryBuilder::new(
         r#"
         SELECT
             r.id,
@@ -522,15 +561,25 @@ fn base_ranked_query() -> QueryBuilder<'static, Postgres> {
             rank.contributor_score,
             rank.activity_score,
             rank.maintenance_score,
-            rank.trend_score,
+            (rank.velocity_score * "#);
+    qb.push_bind(weights.velocity_weight);
+    qb.push(" + rank.growth_score * ");
+    qb.push_bind(weights.growth_weight);
+    qb.push(" + rank.contributor_score * ");
+    qb.push_bind(weights.contributor_weight);
+    qb.push(" + rank.hiring_score * ");
+    qb.push_bind(weights.hiring_weight);
+    qb.push(" + rank.social_score * ");
+    qb.push_bind(weights.social_weight);
+    qb.push(r#")::FLOAT as trend_score,
             rank.social_score,
             (rank.velocity_score * 0.5 + rank.social_score * 0.5)::FLOAT as hype_score,
             rank.hiring_score,
             rank.updated_at
         FROM repositories r
         JOIN rankings rank ON rank.repo_id = r.id
-        "#,
-    )
+        "#);
+    qb
 }
 
 fn valid_limit(limit: Option<i64>) -> i64 {

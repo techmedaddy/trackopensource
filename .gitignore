@@ -1,3 +1,18 @@
 .env
 backend/.env
 frontend/.env
+
+# Node
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+dist/
+
+# Rust
+target/
+backend/target/
+**/*.rs.bk
+
+# OS
+.DS_Store

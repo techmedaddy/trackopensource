@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE scan_jobs SET status = 'failed', finished_at = now(), error = $1 WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b28d8e5938de5361d42da80b2d0eba0b0586161ce4c13f6142b219e5023367d8"
+}

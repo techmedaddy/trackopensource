@@ -116,9 +116,26 @@ export async function apiGet<T>(path: string): Promise<T> {
   }
 }
 
-export async function getRankedRepositories(path: string) {
+export async function getRankedRepositories(
+  path: string,
+  weights?: { vw?: number; gw?: number; cw?: number; hw?: number; sw?: number }
+) {
   try {
-    return await apiGet<RankedRepository[]>(path);
+    let url = path;
+    if (weights) {
+      const params = new URLSearchParams();
+      if (weights.vw !== undefined) params.append("vw", weights.vw.toString());
+      if (weights.gw !== undefined) params.append("gw", weights.gw.toString());
+      if (weights.cw !== undefined) params.append("cw", weights.cw.toString());
+      if (weights.hw !== undefined) params.append("hw", weights.hw.toString());
+      if (weights.sw !== undefined) params.append("sw", weights.sw.toString());
+      
+      const paramStr = params.toString();
+      if (paramStr) {
+        url += (url.includes('?') ? '&' : '?') + paramStr;
+      }
+    }
+    return await apiGet<RankedRepository[]>(url);
   } catch {
     return [];
   }

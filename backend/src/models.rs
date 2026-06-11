@@ -3,6 +3,27 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RankingWeights {
+    pub velocity_weight: f64,
+    pub growth_weight: f64,
+    pub contributor_weight: f64,
+    pub hiring_weight: f64,
+    pub social_weight: f64,
+}
+
+impl RankingWeights {
+    pub fn validate(&self) -> bool {
+        let sum = self.velocity_weight
+            + self.growth_weight
+            + self.contributor_weight
+            + self.hiring_weight
+            + self.social_weight;
+        (sum - 1.0).abs() < 1e-5
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct Repository {
