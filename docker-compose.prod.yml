@@ -42,6 +42,24 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["worker"]
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
