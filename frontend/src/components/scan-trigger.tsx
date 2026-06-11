@@ -42,18 +42,25 @@ export function ScanTrigger() {
   };
 
   return (
-    <div className="flex flex-col items-end justify-center">
+    <div className="flex flex-col items-end justify-center relative">
       <button
         onClick={triggerScan}
         disabled={isLoading}
         className="flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-600 disabled:opacity-50 transition-colors"
       >
-        {isLoading ? "Starting Scan..." : "Trigger Live Scan"}
+        {isLoading ? "Queuing Scan..." : "Trigger Live Scan"}
       </button>
       {message && (
-        <p className={`mt-2 text-xs font-medium ${isError ? "text-red-600" : "text-green-600"}`}>
-          {message}
-        </p>
+        <div className={`mt-2 p-2 pr-6 border rounded relative w-64 break-words text-xs font-medium ${isError ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"}`}>
+          <p>{message}</p>
+          <button 
+            onClick={() => setMessage("")}
+            className={`absolute top-1 right-1 p-1 hover:bg-black/5 rounded ${isError ? "text-red-700" : "text-green-700"}`}
+            aria-label="Dismiss"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
       )}
     </div>
   );
