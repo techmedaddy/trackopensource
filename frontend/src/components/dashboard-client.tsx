@@ -11,7 +11,7 @@ import { GithubSearchPanel } from "@/components/github-search";
 import { ScanTrigger } from "@/components/scan-trigger";
 import { RepoSideSheet } from "@/components/repo-side-sheet";
 import { CommandPalette } from "@/components/command-palette";
-import { TopGainersWidget } from "@/components/top-gainers-widget";
+
 import { PersonaAnalyzer } from "@/components/persona-analyzer";
 import { HypeVsHiringMatrix } from "@/components/scatter-plot";
 import {
@@ -178,7 +178,6 @@ export function DashboardClient({
         </div>
       </header>
 
-      <TopGainersWidget repositories={fastestGrowing} onSelectRepo={setSelectedRepoId} />
 
       <CategoryFilter
         categories={facets?.categories ?? []}
