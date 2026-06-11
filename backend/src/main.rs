@@ -42,9 +42,12 @@ async fn main() {
         manual_triggers: Arc::new(Mutex::new(Vec::new())),
     };
 
-    // Allow CORS for local development and production
+    let frontend_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let allow_origin = frontend_url.parse::<HeaderValue>().unwrap();
+
     let cors = CorsLayer::new()
-        .allow_origin(tower_http::cors::Any)
+        .allow_origin(allow_origin)
+        .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
 

@@ -278,13 +278,13 @@ export function DashboardClient({
           }
           unframed
         />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="w-full">
           {risingProjects.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-5 text-sm text-neutral-500">
+            <div className="w-full rounded-lg border border-dashed border-neutral-300 bg-white p-5 text-sm text-neutral-500 text-center">
               No rising projects yet. Add smaller repositories to the collector seed list.
             </div>
           ) : (
-            risingProjects.map((repo) => <RisingCard key={repo.id} repo={repo} onSelectRepo={setSelectedRepoId} />)
+            risingProjects.slice(0, 1).map((repo) => <RisingCard key={repo.id} repo={repo} onSelectRepo={setSelectedRepoId} />)
           )}
         </div>
       </section>

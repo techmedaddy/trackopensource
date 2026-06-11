@@ -1,4 +1,3 @@
-use backend::ranking;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 
@@ -16,13 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&db_url)
         .await?;
 
-    let summary = ranking::refresh_default_rankings(&pool).await?;
-
-    tracing::info!(
-        "Ranking engine complete: scored {} repositories across {:?} day windows",
-        summary.repositories_scored,
-        summary.timeframe_days
-    );
+    backend::ranker::run(&pool).await?;
 
     Ok(())
 }

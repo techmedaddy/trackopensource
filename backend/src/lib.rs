@@ -1,4 +1,6 @@
 pub mod categorize;
+pub mod collector;
+pub mod ranker;
 pub mod error;
 pub mod models;
 pub mod ranking;

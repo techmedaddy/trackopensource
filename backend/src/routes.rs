@@ -322,51 +322,15 @@ pub async fn trigger_scan(
         triggers.push(now);
     }
 
-    // Spawn a background task to run the binaries
-    tokio::spawn(async {
-        tracing::info!("Manual scan triggered. Starting collector...");
-        
-        // Execute collector
-        let collector_status = tokio::process::Command::new("cargo")
-            .arg("run")
-            .arg("--bin")
-            .arg("collector")
-            .status()
-            .await;
-            
-        // Note: In a production docker container without `cargo`, it would just be `Command::new("collector")`.
-        // For dual-compatibility locally and in production (if production paths are setup), we try `collector` if cargo fails.
-        let collector_success = match collector_status {
-            Ok(status) if status.success() => true,
-            _ => {
-                // Try production path directly
-                if let Ok(status) = tokio::process::Command::new("collector").status().await {
-                    status.success()
-                } else {
-                    false
-                }
-            }
-        };
-
-        if collector_success {
-            tracing::info!("Collector finished successfully. Starting ranker...");
-            let ranker_status = tokio::process::Command::new("cargo")
-                .arg("run")
-                .arg("--bin")
-                .arg("ranker")
-                .status()
-                .await;
-            if ranker_status.is_err() {
-                let _ = tokio::process::Command::new("ranker").status().await;
-            }
-        } else {
-            tracing::error!("Collector failed to run.");
-        }
-    });
+    let job_id = sqlx::query_scalar::<_, Uuid>(
+        "INSERT INTO scan_jobs (job_type, triggered_by) VALUES ('full', 'api') RETURNING id"
+    )
+    .fetch_one(&state.pool)
+    .await?;
 
     Ok(Json(serde_json::json!({
         "status": "success", 
-        "message": "Scan triggered and is running in the background!"
+        "message": format!("Scan triggered with job ID: {}", job_id)
     })))
 }
 
