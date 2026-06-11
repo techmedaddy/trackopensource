@@ -40,7 +40,7 @@ export function TopGainersWidget({ repositories, onSelectRepo }: TopGainersWidge
                 {repo.name}
               </div>
               <div className="flex items-center gap-1 px-2 py-1 bg-rose-500/10 rounded-full border border-rose-500/20 text-rose-400 text-xs font-bold">
-                +{repo.growthRatio.toFixed(1)}%
+                +{(repo.growthRatio * 100).toFixed(1)}%
               </div>
             </div>
             
