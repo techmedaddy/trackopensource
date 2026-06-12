@@ -1,13 +1,27 @@
-FROM rust:latest
+# ── Stage 1: Tooling ──────────────────────────────────────────
+# Install cargo-watch and sqlx-cli once in a cached layer
+FROM rust:slim AS tooling
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN cargo install cargo-watch --locked \
+    && cargo install sqlx-cli --no-default-features --features rustls,postgres --locked
+
+# ── Stage 2: Dev Runtime ──────────────────────────────────────
+# Slim image with only the pre-built tools copied in
+FROM rust:slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-compiled tools from builder
+COPY --from=tooling /usr/local/cargo/bin/cargo-watch /usr/local/cargo/bin/cargo-watch
+COPY --from=tooling /usr/local/cargo/bin/sqlx /usr/local/cargo/bin/sqlx
 
 WORKDIR /usr/src/app
 
-# Install cargo-watch for hot-reloading
-RUN cargo install cargo-watch
-
-# Install sqlx-cli for migrations
-RUN cargo install sqlx-cli --no-default-features --features rustls,postgres
-
-COPY . .
-
+# Source is bind-mounted at runtime via docker-compose volumes
 CMD sqlx database create && sqlx migrate run && cargo watch -x "run --bin backend"

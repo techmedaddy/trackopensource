@@ -35,8 +35,8 @@ export function HypeVsHiringMatrix({
       id: repo.id,
       name: repoFullName(repo),
       language: repo.language ?? "Unknown",
-      hype: Math.round(hypeScore * 10) / 10,
-      hiring: Math.round(hiringScore * 10) / 10,
+      hype_score: Math.round(hypeScore * 10) / 10,
+      hiring_score: Math.round(hiringScore * 10) / 10,
       stars: repo.stars,
       categories: repo.categories || [],
       // Color coding based on quadrant
@@ -55,12 +55,12 @@ export function HypeVsHiringMatrix({
           <div className="font-semibold text-neutral-800 mb-1">{data.name}</div>
           <div className="text-xs text-neutral-500 mb-3">{data.language} • {data.stars.toLocaleString()} stars</div>
           <div className="flex justify-between items-center mb-1">
-            <span className="text-neutral-600">Developer Hype</span>
-            <span className="font-medium text-orange-600">{data.hype}</span>
+            <span className="text-neutral-600">Hype Momentum</span>
+            <span className="font-mono tabular-nums font-medium text-orange-600">{data.hype_score.toFixed(1)}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-neutral-600">Hiring Demand</span>
-            <span className="font-medium text-blue-600">{data.hiring}</span>
+            <span className="font-mono tabular-nums font-medium text-blue-600">{data.hiring_score.toFixed(1)}%</span>
           </div>
           <div className="mt-3 text-[10px] text-neutral-400 text-center uppercase tracking-widest">
             Click to view details
@@ -97,7 +97,7 @@ export function HypeVsHiringMatrix({
           
           <XAxis 
             type="number" 
-            dataKey="hype" 
+            dataKey="hype_score" 
             name="Developer Hype" 
             domain={[0, 100]}
             tickFormatter={(val) => val.toString()}
@@ -106,7 +106,7 @@ export function HypeVsHiringMatrix({
           />
           <YAxis 
             type="number" 
-            dataKey="hiring" 
+            dataKey="hiring_score" 
             name="Hiring Demand" 
             domain={[0, 100]}
             stroke="#9ca3af"

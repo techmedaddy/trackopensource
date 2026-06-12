@@ -1,13 +1,12 @@
-FROM node:20
+FROM node:20-slim
 
 WORKDIR /app
 
+# Dependencies are installed inside the anonymous volume at runtime
+# The compose volumes handle bind-mounting the source code
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm install --prefer-offline
 
-COPY . .
-
-# Expose port for Next.js
 EXPOSE 3000
 
 CMD ["npm", "run", "dev"]
