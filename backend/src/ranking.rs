@@ -107,9 +107,29 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
     .fetch_all(pool)
     .await?;
 
+    // Total distinct companies posting in this window (denominator for penetration %)
+    let total_companies: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(DISTINCT company_name) as "count!"
+        FROM job_mentions
+        WHERE posted_at >= (NOW() - make_interval(days := $1))
+        "#,
+        timeframe_days
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
     let mut job_map: HashMap<Uuid, i64> = HashMap::new();
     for row in job_data {
-        job_map.insert(row.repo_id, row.total_jobs.unwrap_or(0));
+        let raw_count = row.total_jobs.unwrap_or(0);
+        // Normalize as penetration percentage: (mentions / total_companies) * 100
+        let penetration = if total_companies > 0 {
+            (raw_count as f64 / total_companies as f64 * 100.0) as i64
+        } else {
+            raw_count
+        };
+        job_map.insert(row.repo_id, penetration);
     }
 
     let mut current_repo_id: Option<Uuid> = None;

@@ -25,6 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Starting background job worker...");
 
+    let client = reqwest::Client::new();
+
     loop {
         // Atomically claim the next available job
         let job = sqlx::query_as!(
@@ -57,6 +59,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         res = backend::ranker::run(&pool).await;
                     }
                     res
+                }
+                "hiring_scan" => {
+                    // Fetch tracked repos for the HN alias engine
+                    let tracked: Vec<(uuid::Uuid, String)> = sqlx::query_as::<_, (uuid::Uuid, String)>(
+                        "SELECT id, name FROM repositories WHERE is_tracked = true"
+                    )
+                    .fetch_all(&pool)
+                    .await
+                    .unwrap_or_default();
+
+                    backend::jobs::scrape_hn_hiring_threads(&client, &pool, &tracked).await
                 }
                 _ => Err(format!("Unknown job_type: {}", job.job_type).into()),
             };
