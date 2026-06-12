@@ -1,0 +1,176 @@
+# System Architecture
+
+This document details the architectural topology, data flow, and request lifecycles of TrackOpenSource. The system is designed around a decoupled producer-consumer model where lightweight Next.js clients communicate with a Rust/Axum gateway, which in turn offloads heavy ingestion tasks to asynchronous background workers via PostgreSQL row-locking.
+
+## 1. High-Level Architecture
+
+The platform operates across four primary distinct environments:
+
+1. **Client Presentation (Next.js)**: Server-side rendered React application with `use client` visual charting boundaries.
+2. **REST API Gateway (Axum)**: Rust-based HTTP entrypoint handling authentication, rate-limiting, and dynamic SQL query execution.
+3. **Background Daemon (Rust)**: Isolated worker process running an infinite `FOR UPDATE SKIP LOCKED` task polling loop.
+4. **Data Persistence (PostgreSQL + Redis)**: Primary relational store acting as both the application ledger and the inter-process message broker. Redis handles ephemeral rate-limiting counters.
+
+```mermaid
+graph TD
+    %% Nodes
+    User([User Browser])
+    Proxy(Caddy Reverse Proxy)
+    NextJS[Next.js App Server<br/>Port 3000]
+    Axum[Axum Gateway<br/>Port 8080]
+    Worker[Rust Worker Daemon<br/>Job Poller]
+    DB[(PostgreSQL 15<br/>Port 5432)]
+    Redis[(Redis 7<br/>Port 6379)]
+    Clerk[Clerk Auth JWKS]
+    GitHub[GitHub API]
+    HN[HackerNews API]
+
+    %% Connections
+    User -- "HTTPS / WSS" --> Proxy
+    Proxy -- "/_next, /*" --> NextJS
+    Proxy -- "/api/*" --> Axum
+    NextJS -. "Next.js Rewrites<br/>(next.config.ts)" .-> Axum
+    NextJS -- "Verify Auth" --> Clerk
+    Axum -- "JWKS Signature Verify" --> Clerk
+    Axum -- "Rate Limit Counters" --> Redis
+    Axum -- "Read/Write/Queue Jobs" --> DB
+    Worker -- "SELECT FOR UPDATE SKIP LOCKED" --> DB
+    Worker -- "Fetch Velocity" --> GitHub
+    Worker -- "Fetch Mentions" --> HN
+    Worker -- "Commit Snapshots" --> DB
+
+    classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155;
+    classDef boundary fill:none,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef external fill:#f1f5f9,stroke:#64748b,stroke-width:1px,color:#475569;
+    classDef db fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#3730a3;
+    classDef core fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e40af;
+    
+    class User,Clerk,GitHub,HN external;
+    class DB,Redis db;
+    class NextJS,Axum,Worker core;
+```
+
+## 2. Frontend/Backend Communication
+
+Frontend and backend communication bridges across Next.js and Rust using standard HTTP protocols secured by Clerk JWTs and API keys.
+
+*   **Proxying (CORS Bypass):** As defined in `frontend/next.config.ts`, requests to `/api/*` on the Next.js dev server are rewritten to `http://localhost:8080/api/*`. In production (`Caddyfile`), Caddy routes `/api/*` directly to the Rust container.
+*   **Authentication (JWT):** The frontend relies on Clerk (`frontend/src/middleware.ts`) to manage sessions. When making authenticated requests (e.g., `POST /api/trigger` in `scan-trigger.tsx`), the frontend attaches a `Bearer` token. The backend (`backend/src/auth.rs`) decodes this via `jsonwebtoken` against Clerk's public PEM key.
+*   **Programmatic Access:** External developers use API keys (e.g., `osr_xyz`). The backend `backend/src/api_auth.rs` extracts the `x-api-key` header, hashes it with SHA-256, verifies it in PostgreSQL, and increments a rate-limit counter in Redis.
+
+## 3. Request Flow: The Query Pipeline (Synchronous)
+
+When a user loads the dashboard, the Next.js client requests the trending repositories. The backend executes a complex dynamic SQL projection rather than relying on materialized views, allowing runtime weight adjustments (`vw`, `hw`, `sw`).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Frontend as Next.js Client (scatter-plot.tsx)
+    participant Gateway as Axum Gateway (routes.rs)
+    participant Auth as Auth Middleware (auth.rs)
+    participant DB as PostgreSQL (rankings)
+
+    User->>Frontend: Loads Dashboard (e.g., vw=0.5, hw=1.5)
+    Frontend->>Gateway: GET /api/trending?vw=0.5&hw=1.5
+    Gateway->>Auth: Pass-through (Public Route)
+    Auth-->>Gateway: OK
+    Gateway->>DB: Execute dynamic projection (base_ranked_query)
+    Note over Gateway,DB: Multiplies base scores by custom weights at runtime.
+    DB-->>Gateway: Returns Vec<RankedRepository>
+    Gateway-->>Frontend: JSON payload
+    Frontend-->>User: Renders ScatterChart (Recharts)
+```
+
+**Implementation references:**
+*   `frontend/src/components/dashboard-client.tsx`
+*   `backend/src/routes.rs` -> `trending()`
+*   `backend/src/routes.rs` -> `base_ranked_query()`
+
+## 4. Data Flow: The Ingestion Pipeline (Asynchronous)
+
+Data collection is entirely decoupled from user requests. Users can queue a "Scan" job, but the actual HTTP scraping is handled by the background daemon to protect the web server from thread starvation and API rate limits.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Gateway as Axum (routes.rs)
+    participant DB as PostgreSQL (scan_jobs)
+    participant Worker as Daemon (worker.rs)
+    participant Collector as Collector (collector.rs)
+    participant External as GitHub / HackerNews
+
+    User->>Gateway: POST /api/trigger (Requires JWT)
+    Gateway->>Gateway: Check manual_triggers Array (Max 3/hour)
+    Gateway->>DB: INSERT INTO scan_jobs (status='queued') RETURNING id
+    DB-->>Gateway: job_id
+    Gateway-->>User: 202 Accepted (Job Queued)
+
+    loop Every 5 seconds
+        Worker->>DB: SELECT FOR UPDATE SKIP LOCKED
+        DB-->>Worker: Lock acquired on row (status='running')
+        Worker->>Collector: Execute backend::collector::run()
+        Collector->>External: Fetch Stars, Forks, Contributors
+        Collector->>External: Fetch HN Mentions (Algolia)
+        External-->>Collector: JSON Data
+        Collector->>DB: Upsert repositories, snapshots, social_mentions
+        Collector-->>Worker: OK
+        Worker->>DB: UPDATE scan_jobs SET status='done'
+    end
+```
+
+**Implementation references:**
+*   `backend/src/bin/worker.rs` (Daemon loop)
+*   `backend/src/collector.rs` (GitHub scraping logic)
+*   `backend/src/hacker_news.rs` (Algolia fetching)
+*   `backend/src/jobs.rs` (Hiring thread tokenization)
+
+## 5. Deployment Architecture
+
+TrackOpenSource uses a containerized deployment model managed via Docker Compose (`docker-compose.prod.yml`). The production stack operates within a private Docker network bridge, ensuring internal services (like the database and backend) are never exposed directly to the public internet.
+
+```mermaid
+graph TD
+    %% Internet Boundary
+    Internet((Public Internet))
+
+    subgraph "Host Node (AWS/DigitalOcean)"
+        %% Containers
+        Caddy[Caddy Container<br/>Ports: 80, 443]
+        Frontend[Next.js Container<br/>Expose: 3000]
+        Backend[Axum Container<br/>Expose: 8080]
+        Worker1[Worker Container]
+        Worker2[Worker Container]
+        DB[(PostgreSQL 15 Container<br/>Expose: 5432)]
+        Redis[(Redis 7 Container<br/>Expose: 6379)]
+
+        %% Routing
+        Caddy -- "Reverse Proxy" --> Frontend
+        Caddy -- "Reverse Proxy (/api/*)" --> Backend
+        
+        %% Internal Comms
+        Frontend -- "Server-side fetch()" --> Backend
+        Backend -- "SQLx Pool" --> DB
+        Backend -- "deadpool" --> Redis
+        Worker1 -- "SQLx" --> DB
+        Worker2 -- "SQLx" --> DB
+    end
+
+    Internet -- "HTTPS" --> Caddy
+
+    classDef proxy fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff;
+    classDef app fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff;
+    classDef worker fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff;
+    classDef data fill:#6366f1,stroke:#4338ca,stroke-width:2px,color:#fff;
+
+    class Caddy proxy;
+    class Frontend,Backend app;
+    class Worker1,Worker2 worker;
+    class DB,Redis data;
+```
+
+**Deployment specific notes:**
+*   **Horizontal Scaling:** The worker daemon is stateless. As shown in the diagram, `Worker1` and `Worker2` can run simultaneously. Because they use `FOR UPDATE SKIP LOCKED` on the `scan_jobs` table, they will never process the same job twice.
+*   **Rate Limit Data:** The Redis container is explicitly used to track ephemeral rate-limiting sliding windows (e.g., `rate_limit:api_key:{user_id}`). If Redis crashes, the API fails-closed (returns `500`).
+*   **Static Assets:** Handled internally by Next.js's standalone output server (`server.js`), not offloaded to Caddy.
