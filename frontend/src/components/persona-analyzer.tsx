@@ -1,20 +1,4 @@
-"use client";
-
-import { useState } from "react";
-import { formatScore } from "@/lib/api";
-
-type PersonaResult = {
-  username: string;
-  persona: string;
-  description: string;
-  color: string;
-  matches: number;
-  averageHiring: number;
-  averageTrend: number;
-  averageSocial: number;
-  matchedRepos: string[];
-  error?: string;
-};
+import Link from "next/link";
 
 export function PersonaAnalyzer() {
   return (
@@ -27,26 +11,20 @@ export function PersonaAnalyzer() {
           Coming Soon
         </span>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-900 mb-4">
-          AI-Powered Architectural Persona
+          Discover Your Developer Archetype
         </h2>
         <p className="text-sm sm:text-base text-neutral-500 mb-8 max-w-lg mx-auto leading-relaxed">
-          We are training a custom LLM to analyze your GitHub starred repositories, code contributions, and issues to determine your exact technology taste and engineering archetype.
+          Instantly re-calculate the entire dashboard based on what matters to you. Find out if you're a Job Seeker, a VC Investor, or an Enterprise Architect.
         </p>
 
-        <div className="flex flex-col sm:flex-row w-full gap-3 justify-center mb-4">
-          <button
+        <div className="flex flex-col sm:flex-row w-full gap-4 justify-center mb-4">
+          <Link
             data-testid="persona-job-seeker"
-            onClick={() => {
-              // Trigger the network interception payload for the E2E matrix tests
-              fetch('/api/repositories?hw=0.6&vw=0.1&sw=0.3');
-              
-              // In the full implementation, this would mutate global SWR state 
-              // and physically shift the scatter plot coordinate mappings.
-            }}
-            className="px-6 py-3 rounded-xl bg-green-700 text-white font-bold tracking-wide shadow-sm hover:bg-green-600 transition-colors"
+            href="/persona"
+            className="px-8 py-4 rounded-xl bg-green-600 text-white font-bold tracking-wide shadow-sm hover:bg-green-700 transition-colors"
           >
-            Job-Seeker Profile Card
-          </button>
+            Check Your Persona
+          </Link>
         </div>
       </div>
     </div>
