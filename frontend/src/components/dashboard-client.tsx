@@ -74,7 +74,7 @@ export function DashboardClient({
   // Use SWR for client-side stale-while-revalidate caching
   // We pass the Server-Side Rendered data as `fallbackData` so the page loads instantly.
   const { data: trending = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=10&timeframeDays=${timeframeDays}${categoryParam}`,
+    `/api/trending?limit=11&timeframeDays=${timeframeDays}${categoryParam}`,
     fetcher,
     { fallbackData: activeCategory ? undefined : initialTrending, keepPreviousData: true, refreshInterval: 60000 }
   );
