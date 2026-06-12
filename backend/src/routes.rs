@@ -347,7 +347,7 @@ pub async fn trigger_scan(
 
     Ok(Json(serde_json::json!({
         "status": "success", 
-        "message": format!("Scan triggered with job ID: {}", job_id)
+        "message": "Scan queued successfully. Worker is processing in background."
     })))
 }
 

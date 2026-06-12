@@ -29,7 +29,7 @@ export function ScanTrigger() {
         setIsError(true);
         setMessage(data.error || "Failed to trigger scan.");
       } else {
-        setMessage(data.message || "Scan triggered successfully.");
+        setMessage("Scan triggered. Please wait a few moments.");
         // Clear success message after 5 seconds
         setTimeout(() => setMessage(""), 5000);
       }
