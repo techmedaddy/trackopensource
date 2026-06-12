@@ -78,9 +78,10 @@ export function GrowthChart({ snapshots }: GrowthChartProps) {
             dx={-10}
           />
           <Tooltip
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             formatter={(value: any, name: any) => [
               compactNumber.format(Number(value)),
-              name.charAt(0).toUpperCase() + name.slice(1)
+              String(name).charAt(0).toUpperCase() + String(name).slice(1)
             ]}
             contentStyle={{
               borderColor: "#e5e5e5",

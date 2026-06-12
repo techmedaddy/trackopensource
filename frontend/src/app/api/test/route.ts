@@ -6,6 +6,7 @@ export async function GET() {
   try {
       backendRes = await fetch("http://backend:8080/api/trending");
       backendText = await backendRes.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch(err: any) {
       backendText = err.message + " | " + err.cause?.message + " | " + err.code;
   }

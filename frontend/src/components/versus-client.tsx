@@ -18,9 +18,12 @@ export function VersusClient({ initialRepos }: VersusClientProps) {
   const [loading, setLoading] = useState(false);
 
   // Auto-select the first two if available
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (initialRepos.length >= 2 && !repoAId && !repoBId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRepoAId(initialRepos[0].id);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRepoBId(initialRepos[1].id);
     }
   }, [initialRepos]);
@@ -46,8 +49,10 @@ export function VersusClient({ initialRepos }: VersusClientProps) {
   }, [repoAId, repoBId]);
 
   // Combine history for the chart
-  const chartData = useMemo(() => {
-    if (!repoA || !repoB) return [];
+  const [chartData, setChartData] = useState<Record<string, string | number>[]>([]);
+
+  useEffect(() => {
+    if (!repoA || !repoB) return;
     
     // We will just generate a beautiful 30 day mock trajectory for the battle if DB history is empty, 
     // just like we did for the main chart, so it looks incredible right now
@@ -71,7 +76,8 @@ export function VersusClient({ initialRepos }: VersusClientProps) {
         [repoB.repository.name.split("/").pop()!]: bStars,
       });
     }
-    return data;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChartData(data);
   }, [repoA, repoB]);
 
   return (

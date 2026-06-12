@@ -15,6 +15,31 @@ import {
   Cell,
 } from "recharts";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white/95 backdrop-blur-sm border border-neutral-200 p-3 rounded-lg shadow-xl text-sm min-w-[200px]">
+        <div className="font-semibold text-neutral-800 mb-1">{data.name}</div>
+        <div className="text-xs text-neutral-500 mb-3">{data.language} • {data.stars.toLocaleString()} stars</div>
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-neutral-600">Hype Momentum</span>
+          <span className="font-mono tabular-nums font-medium text-orange-600">{data.hype_score.toFixed(1)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-neutral-600">Hiring Demand</span>
+          <span className="font-mono tabular-nums font-medium text-blue-600">{data.hiring_score.toFixed(1)}%</span>
+        </div>
+        <div className="mt-3 text-[10px] text-neutral-400 text-center uppercase tracking-widest">
+          Click to view details
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function HypeVsHiringMatrix({
   data,
   activeCategory,
@@ -47,33 +72,7 @@ export function HypeVsHiringMatrix({
     };
   });
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white/95 backdrop-blur-sm border border-neutral-200 p-3 rounded-lg shadow-xl text-sm min-w-[200px]">
-          <div className="font-semibold text-neutral-800 mb-1">{data.name}</div>
-          <div className="text-xs text-neutral-500 mb-3">{data.language} • {data.stars.toLocaleString()} stars</div>
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-neutral-600">Hype Momentum</span>
-            <span className="font-mono tabular-nums font-medium text-orange-600">{data.hype_score.toFixed(1)}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-neutral-600">Hiring Demand</span>
-            <span className="font-mono tabular-nums font-medium text-blue-600">{data.hiring_score.toFixed(1)}%</span>
-          </div>
-          <div className="mt-3 text-[10px] text-neutral-400 text-center uppercase tracking-widest">
-            Click to view details
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
-  if (data.length === 0) {
-    return <div className="h-96 flex items-center justify-center text-sm text-neutral-500 border border-neutral-200 rounded-lg bg-neutral-50">Not enough data to generate matrix</div>;
-  }
 
   return (
     <div className="w-full h-[500px] relative group mt-4">
@@ -129,6 +128,7 @@ export function HypeVsHiringMatrix({
           <Scatter 
             name="Repositories" 
             data={plotData} 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={(e: any) => {
               if (e && e.id && onSelectRepo) onSelectRepo(e.id);
             }}

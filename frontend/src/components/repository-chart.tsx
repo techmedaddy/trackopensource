@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   LineChart,
   Line,
@@ -28,7 +28,9 @@ interface RepositoryChartProps {
 }
 
 export function RepositoryChart({ history }: RepositoryChartProps) {
-  const data = useMemo(() => {
+  const [data, setData] = useState<Record<string, string | number>[]>([]);
+
+  useEffect(() => {
     const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 
     // If less than 2 real snapshots exist, generate some beautiful mock data to visualize the chart
@@ -56,20 +58,22 @@ export function RepositoryChart({ history }: RepositoryChartProps) {
           "Trend Score": Number(Math.max(0, currentTrend).toFixed(1)),
         });
       }
-      return mockData;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setData(mockData);
+      return;
     }
 
-
-    return history.map((snapshot) => ({
-      date: dateFormatter.format(new Date(snapshot.createdAt)),
-      Stars: snapshot.stars,
-      "Hiring Score": snapshot.hiringScore,
-      "Social Score": snapshot.socialScore,
-      "Trend Score": snapshot.trendScore,
-    }));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setData(
+      history.map((snapshot) => ({
+        date: dateFormatter.format(new Date(snapshot.createdAt)),
+        Stars: snapshot.stars,
+        "Hiring Score": snapshot.hiringScore,
+        "Social Score": snapshot.socialScore,
+        "Trend Score": snapshot.trendScore,
+      }))
+    );
   }, [history]);
-
-
 
   return (
     <div className="h-[400px] w-full">

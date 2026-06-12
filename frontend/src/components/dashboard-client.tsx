@@ -410,6 +410,12 @@ function RepositoryTable({
                 <div className="text-xs text-neutral-500 tabular-nums">
                   {repo.starVelocity.toFixed(1)} / day
                 </div>
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+                  <span className="text-neutral-400 uppercase tracking-widest">Hiring</span>
+                  <span className="font-mono tabular-nums text-zinc-600">
+                    {repo.hiringScore > 0 ? `${repo.hiringScore.toFixed(1)}%` : '0.0%'}
+                  </span>
+                </div>
               </td>
               <td className="px-5 py-4 text-right w-[10%]">
                 <ScorePill score={repo.trendScore} />
@@ -452,6 +458,12 @@ function VelocityRow({ repo, onSelectRepo }: { repo: RankedRepository, onSelectR
         </div>
         <div className="text-xs text-neutral-500 tabular-nums">
           {repo.starVelocity.toFixed(1)} / day
+        </div>
+        <div className="mt-1 flex items-center justify-end gap-1.5 text-[11px]">
+          <span className="text-neutral-400 uppercase tracking-widest">Hiring</span>
+          <span className="font-mono tabular-nums text-zinc-600">
+            {repo.hiringScore > 0 ? `${repo.hiringScore.toFixed(1)}%` : '0.0%'}
+          </span>
         </div>
       </div>
     </div>
