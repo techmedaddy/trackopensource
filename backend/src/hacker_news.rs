@@ -99,3 +99,99 @@ pub async fn save_social_mentions(
     }
     Ok(())
 }
+
+#[derive(Deserialize, Debug)]
+struct HNComment {
+    comment_text: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct HNCommentResponse {
+    hits: Vec<HNComment>,
+}
+
+pub async fn fetch_latest_hiring_thread(client: &Client) -> Result<String, Box<dyn std::error::Error>> {
+    let url = "https://hn.algolia.com/api/v1/search?tags=story,author_whoishiring&searchTarget=title&query=Ask%20HN:%20Who%20is%20hiring?&hitsPerPage=1";
+    let resp = client.get(url).send().await?;
+    let data: AlgoliaResponse = resp.json().await?;
+    if let Some(hit) = data.hits.first() {
+        Ok(hit.object_id.clone())
+    } else {
+        Err("No 'Ask HN: Who is hiring?' thread found".into())
+    }
+}
+
+pub async fn fetch_thread_comments(client: &Client, thread_id: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut all_comments = Vec::new();
+    let mut page = 0;
+    loop {
+        let url = format!("https://hn.algolia.com/api/v1/search_by_date?tags=comment,story_{}&hitsPerPage=100&page={}", thread_id, page);
+        let resp = client.get(&url).send().await?;
+        let data: HNCommentResponse = resp.json().await?;
+        
+        if data.hits.is_empty() {
+            break;
+        }
+
+        for hit in data.hits {
+            if let Some(text) = hit.comment_text {
+                // Text Sanitization & HTML Entity Decoding
+                let decoded = html_escape::decode_html_entities(&text).to_string();
+                let clean = decoded
+                    .replace("<p>", " ")
+                    .replace("</p>", " ")
+                    .replace("<br>", " ")
+                    .replace("<br/>", " ");
+                all_comments.push(clean);
+            }
+        }
+        page += 1;
+    }
+    Ok(all_comments)
+}
+
+pub struct AliasEngine {
+    matchers: std::collections::HashMap<String, regex::Regex>,
+}
+
+impl AliasEngine {
+    pub fn new() -> Self {
+        let mut matchers = std::collections::HashMap::new();
+        // Boundary-Aware Alias Engine Mappings
+        matchers.insert("postgresql".to_string(), regex::Regex::new(r"(?i)\b(postgres|postgresql|psql)\b").unwrap());
+        matchers.insert("kubernetes".to_string(), regex::Regex::new(r"(?i)\b(k8s|kubernetes)\b").unwrap());
+        matchers.insert("react".to_string(), regex::Regex::new(r"(?i)\b(react|reactjs|react\.js)\b").unwrap());
+        matchers.insert("rust".to_string(), regex::Regex::new(r"(?i)\b(rust|rustlang)\b").unwrap());
+        matchers.insert("go".to_string(), regex::Regex::new(r"(?i)\b(go|golang)\b").unwrap());
+        matchers.insert("python".to_string(), regex::Regex::new(r"(?i)\b(python)\b").unwrap());
+        matchers.insert("typescript".to_string(), regex::Regex::new(r"(?i)\b(typescript|ts)\b").unwrap());
+        matchers.insert("redis".to_string(), regex::Regex::new(r"(?i)\b(redis)\b").unwrap());
+        matchers.insert("docker".to_string(), regex::Regex::new(r"(?i)\b(docker)\b").unwrap());
+        matchers.insert("nextjs".to_string(), regex::Regex::new(r"(?i)\b(nextjs|next\.js)\b").unwrap());
+        Self { matchers }
+    }
+
+    pub fn scan_comments(&self, comments: &[String]) -> std::collections::HashMap<String, f64> {
+        let total = comments.len() as f64;
+        let mut counts = std::collections::HashMap::new();
+        
+        if total == 0.0 {
+            return std::collections::HashMap::new();
+        }
+
+        for comment in comments {
+            for (tech, regex) in &self.matchers {
+                if regex.is_match(comment) {
+                    *counts.entry(tech.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+
+        let mut percentages = std::collections::HashMap::new();
+        for (tech, count) in counts {
+            percentages.insert(tech.clone(), (count as f64 / total) * 100.0);
+        }
+        
+        percentages
+    }
+}

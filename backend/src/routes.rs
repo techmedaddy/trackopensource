@@ -339,7 +339,7 @@ pub async fn trigger_scan(
         triggers.push(now);
     }
 
-    let job_id = sqlx::query_scalar::<_, Uuid>(
+    let _job_id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO scan_jobs (job_type, triggered_by) VALUES ('full', 'api') RETURNING id"
     )
     .fetch_one(&state.pool)
