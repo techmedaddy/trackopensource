@@ -34,6 +34,19 @@ pub async fn require_auth(
         }
     };
 
+    let is_e2e = std::env::var("E2E_TEST_MODE").unwrap_or_default() == "true";
+    
+    if is_e2e && (token == "mock-clerk-jwt-token" || token == "null") {
+        tracing::warn!("Mock JWT detected. Bypassing auth for E2E tests.");
+        req.extensions_mut().insert(Claims {
+            sub: "e2e_test_user".to_string(),
+            exp: 0,
+            iss: None,
+            azp: None,
+        });
+        return Ok(next.run(req).await);
+    }
+
     // Replace literal \n with actual newlines if the env var was passed as a single line
     let pem_raw = std::env::var("CLERK_PEM_PUBLIC_KEY")
         .unwrap_or_else(|_| "".to_string());

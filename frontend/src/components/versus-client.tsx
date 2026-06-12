@@ -120,7 +120,7 @@ export function VersusClient({ initialRepos }: VersusClientProps) {
           {/* Overlapping Trajectory Chart */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200">
             <h3 className="text-lg font-bold text-neutral-900 mb-6 text-center">30-Day Star Velocity Battle</h3>
-            <div className="h-[400px] w-full">
+            <div className="h-[400px] w-full" data-testid="versus-chart">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />

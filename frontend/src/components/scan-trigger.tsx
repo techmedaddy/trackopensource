@@ -15,7 +15,11 @@ export function ScanTrigger() {
     setIsError(false);
 
     try {
-      const token = await getToken();
+      let token = await getToken();
+      if (!token && process.env.NEXT_PUBLIC_E2E_TEST_MODE === 'true') {
+        token = "mock-clerk-jwt-token";
+      }
+
       const response = await fetch(`/api/trigger`, {
         method: "POST",
         headers: {

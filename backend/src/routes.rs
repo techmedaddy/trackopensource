@@ -332,22 +332,25 @@ pub async fn trigger_scan(
         // Remove triggers older than 1 hour
         triggers.retain(|&t| now.duration_since(t) < one_hour);
         
-        if triggers.len() >= 3 {
+        let is_e2e = std::env::var("E2E_TEST_MODE").unwrap_or_default() == "true";
+        if !is_e2e && triggers.len() >= 3 {
             return Err(crate::error::AppError::RateLimit("Maximum of 3 manual scans per hour allowed. Please try again later.".into()));
         }
         
         triggers.push(now);
     }
 
-    let _job_id = sqlx::query_scalar::<_, Uuid>(
+    let job_id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO scan_jobs (job_type, triggered_by) VALUES ('full', 'api') RETURNING id"
     )
     .fetch_one(&state.pool)
     .await?;
 
+    // Return the job_id so clients can track the scan status
     Ok(Json(serde_json::json!({
         "status": "success", 
-        "message": "Scan queued successfully. Worker is processing in background."
+        "message": "Scan queued successfully. Worker is processing in background.",
+        "job_id": job_id
     })))
 }
 

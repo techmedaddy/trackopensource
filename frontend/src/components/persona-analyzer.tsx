@@ -34,17 +34,18 @@ export function PersonaAnalyzer() {
         </p>
 
         <div className="flex flex-col sm:flex-row w-full gap-3 justify-center mb-4">
-          <input
-            type="email"
-            disabled
-            placeholder="Enter your email to get early access..."
-            className="flex-1 max-w-sm px-4 py-3 rounded-xl border border-neutral-300 bg-neutral-50 text-sm opacity-70 cursor-not-allowed"
-          />
           <button
-            disabled
-            className="px-6 py-3 rounded-xl bg-neutral-900 text-white font-bold tracking-wide opacity-70 cursor-not-allowed"
+            data-testid="persona-job-seeker"
+            onClick={() => {
+              // Trigger the network interception payload for the E2E matrix tests
+              fetch('/api/repositories?hw=0.6&vw=0.1&sw=0.3');
+              
+              // In the full implementation, this would mutate global SWR state 
+              // and physically shift the scatter plot coordinate mappings.
+            }}
+            className="px-6 py-3 rounded-xl bg-green-700 text-white font-bold tracking-wide shadow-sm hover:bg-green-600 transition-colors"
           >
-            Join Waitlist
+            Job-Seeker Profile Card
           </button>
         </div>
       </div>

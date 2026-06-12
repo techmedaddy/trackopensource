@@ -94,7 +94,7 @@ export type RepositoryDetail = {
 const API_BASE_URL =
   typeof window === "undefined"
     ? process.env.INTERNAL_API_URL ?? "http://localhost:8080/api"
-    : process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api";
+    : process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export async function apiGet<T>(path: string): Promise<T> {
   const controller = new AbortController();
