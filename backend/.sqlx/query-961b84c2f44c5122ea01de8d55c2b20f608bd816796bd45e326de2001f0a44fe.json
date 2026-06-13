@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT repo_id as \"repo_id!\", COUNT(id) as \"total_jobs!\"\n        FROM job_mentions\n        WHERE posted_at >= (NOW() - make_interval(days := $1))\n        GROUP BY repo_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "repo_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_jobs!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "961b84c2f44c5122ea01de8d55c2b20f608bd816796bd45e326de2001f0a44fe"
+}

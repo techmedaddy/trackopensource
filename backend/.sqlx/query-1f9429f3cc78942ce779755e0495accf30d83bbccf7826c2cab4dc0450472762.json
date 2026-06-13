@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT repo_id, SUM(score) as total_score, SUM(comments_count) as total_comments, COUNT(id) as total_mentions\n        FROM social_mentions\n        WHERE published_at >= (NOW() - make_interval(days := $1))\n        GROUP BY repo_id\n        ",
+  "query": "\n        SELECT repo_id as \"repo_id!\", SUM(score) as total_score, SUM(comments_count) as total_comments, COUNT(id) as total_mentions\n        FROM social_mentions\n        GROUP BY repo_id\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "repo_id",
+        "name": "repo_id!",
         "type_info": "Uuid"
       },
       {
@@ -25,9 +25,7 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Int4"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -36,5 +34,5 @@
       null
     ]
   },
-  "hash": "d1cc01c6eff6186200f8c376d12c9e4b9ab7e6dc6438f8bbe64564f28886f971"
+  "hash": "1f9429f3cc78942ce779755e0495accf30d83bbccf7826c2cab4dc0450472762"
 }

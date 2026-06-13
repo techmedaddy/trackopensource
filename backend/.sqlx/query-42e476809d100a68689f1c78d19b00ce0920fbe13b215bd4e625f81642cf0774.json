@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT r.stars, r.created_at, k.social_score \n        FROM repositories r\n        JOIN rankings k ON k.repo_id = r.id\n        WHERE k.timeframe_days = 30\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stars",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "social_score",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "42e476809d100a68689f1c78d19b00ce0920fbe13b215bd4e625f81642cf0774"
+}
