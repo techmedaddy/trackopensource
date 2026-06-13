@@ -12,7 +12,7 @@ export default async function Home(props: { searchParams: SearchParams }) {
 
   // 1. Fetch initial data server-side so it's fully populated on first load (SEO/UX)
   const [trending, fastestGrowing, risingProjects] = await Promise.all([
-    getRankedRepositories(`/trending?limit=11&timeframeDays=${timeframeDays}`),
+    getRankedRepositories(`/trending?limit=12&timeframeDays=${timeframeDays}`),
     getRankedRepositories(`/fastest-growing?limit=14&timeframeDays=${timeframeDays}`),
     getRankedRepositories(`/trending?limit=8&timeframeDays=${timeframeDays}&maxStars=100`),
   ]);

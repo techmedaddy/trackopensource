@@ -74,7 +74,7 @@ export function DashboardClient({
   // Use SWR for client-side stale-while-revalidate caching
   // We pass the Server-Side Rendered data as `fallbackData` so the page loads instantly.
   const { data: trending = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=11&timeframeDays=${timeframeDays}${categoryParam}`,
+    `/api/trending?limit=12&timeframeDays=${timeframeDays}${categoryParam}`,
     fetcher,
     { fallbackData: activeCategory ? undefined : initialTrending, keepPreviousData: true, refreshInterval: 60000 }
   );
@@ -103,9 +103,9 @@ export function DashboardClient({
   ).size;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
       <CommandPalette onSelectRepo={setSelectedRepoId} />
-      <header className="flex flex-col gap-4 border-b border-neutral-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+      <header className="flex flex-col gap-4 border-b border-neutral-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <Link href="/" className="group block w-fit">
             <p className="text-sm font-medium uppercase tracking-[0.18em] text-green-700 transition group-hover:text-green-600">
@@ -120,11 +120,10 @@ export function DashboardClient({
             growth ratio, contributor movement, activity, and maintenance pressure.
           </p>
         </div>
-        <div className="flex flex-col gap-3">
-          <div className="flex justify-end items-center gap-3 h-8">
+        <div className="flex justify-end items-center gap-3 h-8">
             <button
               onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
-              className="group hidden sm:flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-500 hover:border-neutral-300 hover:text-neutral-900 shadow-sm transition-all"
+              className="group hidden sm:flex h-8 items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 text-sm text-neutral-500 hover:border-neutral-300 hover:text-neutral-900 shadow-sm transition-all cursor-pointer"
             >
               <svg className="w-4 h-4 text-neutral-400 group-hover:text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <span>Search</span>
@@ -141,6 +140,7 @@ export function DashboardClient({
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
             </a>
+            <ScanTrigger lastScanAt={leader?.updatedAt} />
             <SignedOut>
               <SignInButton>
                 <button className="text-sm font-medium text-neutral-500 hover:text-neutral-900 transition">
@@ -151,49 +151,41 @@ export function DashboardClient({
             <SignedIn>
               <Link 
                 href="/docs" 
-                className="hidden sm:flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-all shadow-sm"
+                className="hidden sm:flex h-8 items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-all shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                 Docs
               </Link>
               <Link 
                 href="/developer" 
-                className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-sm"
+                className="hidden sm:flex h-8 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition-all shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
                 API
               </Link>
-              <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
+              <div className="ml-1.5 flex items-center">
+                <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
+              </div>
             </SignedIn>
-          </div>
-          <div className="flex items-center justify-end gap-3 text-sm mt-4 sm:mt-0">
-          </div>
         </div>
       </header>
 
       {/* Analytics Context Cards */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 mb-4">
+      <section className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-4">
         <Metric 
           label="Total Tracked" 
           value={trackedCount || 0} 
           description="Open source repositories currently monitored in our database."
-          icon={<svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>}
+          icon={<svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>}
         />
         <Metric
           label="Max Trend Score"
           value={leader ? formatScore(leader.trendScore) : "0.0"}
           description="The highest momentum score achieved by the current #1 project."
-          icon={<svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+          icon={<svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
         />
         <WindowSelector currentWindow={timeframeDays} />
-        <div className="flex flex-col justify-center rounded-xl border border-neutral-200 bg-white p-5 shadow-sm h-full">
-          <ScanTrigger />
-          <div className="text-xs text-neutral-500 font-medium mt-3 text-center">
-            Manually trigger the background ranking pipeline.
-          </div>
-        </div>
       </section>
-
 
       <CategoryFilter
         categories={facets?.categories ?? []}
@@ -232,7 +224,10 @@ export function DashboardClient({
         </div>
       </section>
 
-      <PersonaAnalyzer />
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <RoadmapTeaser />
+        <PersonaAnalyzer />
+      </section>
 
       {watchlist.length > 0 && (
         <section>
@@ -313,18 +308,16 @@ export function DashboardClient({
 
 function Metric({ label, value, description, icon }: { label: string; value: string | number, description?: string, icon?: React.ReactNode }) {
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-5 shadow-sm min-h-[120px]">
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          {icon}
-          <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-            {label}
-          </div>
+    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 shadow-sm">
+      <div className="flex items-center gap-1.5 mb-1">
+        {icon}
+        <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+          {label}
         </div>
-        <div className="text-3xl font-bold tracking-tight text-neutral-900">{value}</div>
       </div>
+      <div className="text-2xl font-bold tracking-tight text-neutral-900">{value}</div>
       {description && (
-        <div className="text-xs text-neutral-500 font-medium mt-3 leading-relaxed">
+        <div className="text-[11px] text-neutral-500 font-medium mt-1 truncate">
           {description}
         </div>
       )}
@@ -334,21 +327,19 @@ function Metric({ label, value, description, icon }: { label: string; value: str
 
 function WindowSelector({ currentWindow }: { currentWindow: string }) {
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-5 shadow-sm min-h-[120px]">
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-          <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-            Time Window
-          </div>
-        </div>
-        <div className="flex items-center gap-3 text-2xl font-semibold text-neutral-300">
-          <Link href="?window=7" className={currentWindow === "7" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>7d</Link>
-          <Link href="?window=30" className={currentWindow === "30" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>30d</Link>
-          <Link href="?window=90" className={currentWindow === "90" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>90d</Link>
+    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 shadow-sm">
+      <div className="flex items-center gap-1.5 mb-1">
+        <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+          Time Window
         </div>
       </div>
-      <div className="text-xs text-neutral-500 font-medium mt-3 leading-relaxed">
+      <div className="flex items-center gap-3 text-2xl font-semibold text-neutral-300">
+        <Link href="?window=7" className={currentWindow === "7" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>7d</Link>
+        <Link href="?window=30" className={currentWindow === "30" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>30d</Link>
+        <Link href="?window=90" className={currentWindow === "90" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>90d</Link>
+      </div>
+      <div className="text-[11px] text-neutral-500 font-medium mt-1 truncate">
         The historical period used to calculate velocity and momentum.
       </div>
     </div>
@@ -614,5 +605,114 @@ function CategoryFilter({
         </button>
       ))}
     </div>
+  );
+}
+
+function RoadmapTeaser() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  return (
+    <>
+      <div className="w-full h-full bg-white border border-neutral-200 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col items-start text-left relative overflow-hidden group/card">
+        <div className="absolute -bottom-32 -left-32 w-[500px] h-[500px] bg-emerald-50/80 rounded-full blur-3xl opacity-70 pointer-events-none transition-opacity duration-500 group-hover/card:opacity-100" />
+        
+        <div className="relative z-10 w-full flex flex-col h-full">
+          <div className="flex items-center justify-between w-full mb-4">
+            <span className="inline-flex items-center justify-center rounded-md bg-neutral-100 px-2.5 py-1 text-[10px] font-bold text-neutral-600 tracking-widest uppercase shadow-sm border border-neutral-200/50">
+              Next Release
+            </span>
+          </div>
+          
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 mb-2">
+            Open Source Intelligence
+          </h2>
+          <p className="text-sm sm:text-base text-neutral-600 mb-8">
+            Stop guessing. Start knowing exactly where you and your projects stand in the ecosystem.
+          </p>
+
+          <div className="flex flex-col gap-3 flex-1 w-full justify-center mb-6">
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="group flex gap-4 items-start p-3 -mx-3 rounded-xl hover:bg-neutral-50/80 transition-colors text-left"
+            >
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50 group-hover:bg-emerald-100/80 transition-colors shadow-sm mt-0.5">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 mb-1 group-hover:text-emerald-700 transition-colors">Developer DNA Analysis</h3>
+                <p className="text-[13px] text-neutral-500 leading-relaxed">
+                  <span className="font-semibold text-neutral-700">Paste GitHub profile.</span> Discover your builder archetype and ecosystem fit.
+                </p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="group flex gap-4 items-start p-3 -mx-3 rounded-xl hover:bg-neutral-50/80 transition-colors text-left"
+            >
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/50 group-hover:bg-indigo-100/80 transition-colors shadow-sm mt-0.5">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 mb-1 group-hover:text-indigo-700 transition-colors">Repository Intelligence</h3>
+                <p className="text-[13px] text-neutral-500 leading-relaxed">
+                  <span className="font-semibold text-neutral-700">Paste repository URL.</span> Instantly benchmark true enterprise adoption.
+                </p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="group flex gap-4 items-start p-3 -mx-3 rounded-xl hover:bg-neutral-50/80 transition-colors text-left"
+            >
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center border border-violet-100/50 group-hover:bg-violet-100/80 transition-colors shadow-sm mt-0.5">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 mb-1 group-hover:text-violet-700 transition-colors">Organization Ecosystem</h3>
+                <p className="text-[13px] text-neutral-500 leading-relaxed">
+                  <span className="font-semibold text-neutral-700">Paste organization URL.</span> Uncover aggregate momentum and positioning.
+                </p>
+              </div>
+            </button>
+          </div>
+
+          <div className="mt-auto pt-5 border-t border-neutral-100 w-full flex items-center justify-between">
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-neutral-900 text-white text-sm font-medium shadow-sm hover:bg-neutral-800 transition-colors"
+            >
+              Preview Features &rarr;
+            </button>
+            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5 bg-neutral-50 px-2.5 py-1 rounded-md border border-neutral-100">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Coming Soon
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden relative">
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+              </div>
+              <h3 className="text-xl font-bold text-neutral-900 mb-2">Early Access Only</h3>
+              <p className="text-sm text-neutral-600 mb-6 leading-relaxed">
+                Developer DNA and deep Repository Intelligence are currently rolling out to early beta testers. 
+              </p>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="w-full px-5 py-2.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors shadow-sm"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
