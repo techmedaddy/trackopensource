@@ -166,17 +166,33 @@ export function DashboardClient({
               <UserButton appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }} />
             </SignedIn>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <Metric label="Tracked" value={trackedCount || 0} />
-            <WindowSelector currentWindow={timeframeDays} />
-            <Metric
-              label="Leader"
-              value={leader ? formatScore(leader.trendScore) : "0.0"}
-            />
-            <ScanTrigger />
+          <div className="flex items-center justify-end gap-3 text-sm mt-4 sm:mt-0">
           </div>
         </div>
       </header>
+
+      {/* Analytics Context Cards */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 mb-4">
+        <Metric 
+          label="Total Tracked" 
+          value={trackedCount || 0} 
+          description="Open source repositories currently monitored in our database."
+          icon={<svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>}
+        />
+        <Metric
+          label="Max Trend Score"
+          value={leader ? formatScore(leader.trendScore) : "0.0"}
+          description="The highest momentum score achieved by the current #1 project."
+          icon={<svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+        />
+        <WindowSelector currentWindow={timeframeDays} />
+        <div className="flex flex-col justify-center rounded-xl border border-neutral-200 bg-white p-5 shadow-sm h-full">
+          <ScanTrigger />
+          <div className="text-xs text-neutral-500 font-medium mt-3 text-center">
+            Manually trigger the background ranking pipeline.
+          </div>
+        </div>
+      </section>
 
 
       <CategoryFilter
@@ -295,27 +311,45 @@ export function DashboardClient({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
+function Metric({ label, value, description, icon }: { label: string; value: string | number, description?: string, icon?: React.ReactNode }) {
   return (
-    <div className="min-w-24 rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-        {label}
+    <div className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-5 shadow-sm min-h-[120px]">
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          {icon}
+          <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+            {label}
+          </div>
+        </div>
+        <div className="text-3xl font-bold tracking-tight text-neutral-900">{value}</div>
       </div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-neutral-900">{value}</div>
+      {description && (
+        <div className="text-xs text-neutral-500 font-medium mt-3 leading-relaxed">
+          {description}
+        </div>
+      )}
     </div>
   );
 }
 
 function WindowSelector({ currentWindow }: { currentWindow: string }) {
   return (
-    <div className="flex min-w-24 flex-col justify-center rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm">
-      <div className="mb-1 text-xs font-medium uppercase tracking-[0.14em] text-neutral-500">
-        Window
+    <div className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-5 shadow-sm min-h-[120px]">
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+            Time Window
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-2xl font-semibold text-neutral-300">
+          <Link href="?window=7" className={currentWindow === "7" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>7d</Link>
+          <Link href="?window=30" className={currentWindow === "30" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>30d</Link>
+          <Link href="?window=90" className={currentWindow === "90" ? "text-green-600 font-bold" : "hover:text-neutral-500 transition-colors"}>90d</Link>
+        </div>
       </div>
-      <div className="flex items-center gap-3 text-sm font-medium text-neutral-400">
-        <Link href="?window=7" className={currentWindow === "7" ? "font-bold text-green-700" : "hover:text-neutral-600"}>7d</Link>
-        <Link href="?window=30" className={currentWindow === "30" ? "font-bold text-green-700" : "hover:text-neutral-600"}>30d</Link>
-        <Link href="?window=90" className={currentWindow === "90" ? "font-bold text-green-700" : "hover:text-neutral-600"}>90d</Link>
+      <div className="text-xs text-neutral-500 font-medium mt-3 leading-relaxed">
+        The historical period used to calculate velocity and momentum.
       </div>
     </div>
   );
