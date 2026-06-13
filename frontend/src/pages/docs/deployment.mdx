@@ -57,7 +57,7 @@ Local development utilizes hot-reloading for both the frontend (Next.js) and the
 ### How Dev Mode Works
 *   **Database Migrations:** The `backend/Dockerfile.dev` automatically executes `sqlx database create` and `sqlx migrate run` upon container start.
 *   **Hot Reloading:** `cargo-watch` monitors the Rust source files and recompiles the backend gateway (`run --bin backend`) and worker daemon (`run --bin worker`).
-*   **API Proxying:** The Next.js frontend runs on `http://localhost:3000`. API calls made to `/api/*` are rewritten via `next.config.ts` to `http://backend:8080/api/*` internally, bypassing CORS issues.
+*   **API Proxying:** The Next.js frontend runs on `http://localhost:3000`. API calls made to `/api/*` are rewritten via `next.config.mjs` to `http://backend:8080/api/*` internally, bypassing CORS issues.
 
 ---
 
@@ -93,6 +93,7 @@ Production deployment focuses on security, performance, and isolated networking.
 As TrackOpenSource grows past 10,000 tracked repositories, the deployment architecture will need to scale beyond a single Docker host.
 
 ### Phase 1: Vertical Scaling (Current)
+*   **Host Server Configuration:** The production EC2 host is configured as a **`t3.small`** instance (2 GB RAM) with a **2 GB Swapfile** (providing 4 GB of total virtual memory) to support stable Next.js production builds and database coordination.
 *   **Database:** Increase PostgreSQL `shared_buffers` and `work_mem` for analytical queries.
 *   **Worker:** The worker daemon is stateless. You can spin up multiple worker containers on the same host to drain the `scan_jobs` queue faster. Because they use `FOR UPDATE SKIP LOCKED`, they will not duplicate work.
 

@@ -29,7 +29,7 @@ graph TD
     User -- "HTTPS / WSS" --> Proxy
     Proxy -- "/_next, /*" --> NextJS
     Proxy -- "/api/*" --> Axum
-    NextJS -. "Next.js Rewrites<br/>(next.config.ts)" .-> Axum
+    NextJS -. "Next.js Rewrites<br/>(next.config.mjs)" .-> Axum
     NextJS -- "Verify Auth" --> Clerk
     Axum -- "JWKS Signature Verify" --> Clerk
     Axum -- "Rate Limit Counters" --> Redis
@@ -54,7 +54,7 @@ graph TD
 
 Frontend and backend communication bridges across Next.js and Rust using standard HTTP protocols secured by Clerk JWTs and API keys.
 
-*   **Proxying (CORS Bypass):** As defined in `frontend/next.config.ts`, requests to `/api/*` on the Next.js dev server are rewritten to `http://localhost:8080/api/*`. In production (`Caddyfile`), Caddy routes `/api/*` directly to the Rust container.
+*   **Proxying (CORS Bypass):** As defined in `frontend/next.config.mjs`, requests to `/api/*` on the Next.js dev server are rewritten to `http://localhost:8080/api/*`. In production (`Caddyfile`), Caddy routes `/api/*` directly to the Rust container.
 *   **Authentication (JWT):** The frontend relies on Clerk (`frontend/src/middleware.ts`) to manage sessions. When making authenticated requests (e.g., `POST /api/trigger` in `scan-trigger.tsx`), the frontend attaches a `Bearer` token. The backend (`backend/src/auth.rs`) decodes this via `jsonwebtoken` against Clerk's public PEM key.
 *   **Programmatic Access:** External developers use API keys (e.g., `osr_xyz`). The backend `backend/src/api_auth.rs` extracts the `x-api-key` header, hashes it with SHA-256, verifies it in PostgreSQL, and increments a rate-limit counter in Redis.
 

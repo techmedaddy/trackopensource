@@ -18,11 +18,11 @@
 
 | Layer | Technology | Version | Purpose |
 |-------|-----------|---------|---------|
-| **Frontend** | Next.js | 16.2.6 | SSR React framework with App Router |
-| **Frontend** | React | 19.2.4 | UI component library |
+| **Frontend** | Next.js | 14.2.15 | SSR React framework with App Router |
+| **Frontend** | React | 18.3.1 | UI component library |
 | **Frontend** | Recharts | 3.8.1 | Scatter plots and time-series charts |
 | **Frontend** | Tailwind CSS | 4.x | Utility-first styling |
-| **Frontend** | Clerk | 7.4.3 | Authentication (JWT + webhooks) |
+| **Frontend** | Clerk | 6.1.0 | Authentication (JWT + webhooks) |
 | **Frontend** | SWR | 2.4.1 | Client-side data fetching |
 | **Frontend** | Playwright | 1.60.0 | End-to-end testing |
 | **Backend** | Rust + Axum | 0.7 | HTTP API gateway |
@@ -105,7 +105,7 @@ trackopensource/
 │   │   ├── scan-trigger.spec.ts
 │   │   ├── versus-mode.spec.ts
 │   │   └── persona-matrix.spec.ts
-│   ├── next.config.ts           # API proxy rewrites to backend
+│   ├── next.config.mjs          # API proxy rewrites to backend
 │   ├── playwright.config.ts
 │   └── package.json
 ├── docker-compose.yml           # Development (5 services)
@@ -159,9 +159,9 @@ trackopensource/
 
 ## 5. Frontend Architecture
 
-- **Framework:** Next.js 16 with App Router, `"use client"` components
+- **Framework:** Next.js 14 with App Router, `"use client"` components
 - **Auth:** Clerk middleware protects all routes except `/sign-in`, `/sign-up`, `/api`
-- **API proxy:** `next.config.ts` rewrites `/api/*` to `http://backend:8080/api/*`
+- **API proxy:** `next.config.mjs` rewrites `/api/*` to `http://backend:8080/api/*`
 - **State management:** SWR for data fetching, React `useState` for local UI state
 - **Visualizations:** Recharts `ScatterChart`, `LineChart`, `BarChart`
 
