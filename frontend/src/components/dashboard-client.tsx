@@ -40,7 +40,7 @@ export function DashboardClient({
   initialRising,
 }: DashboardClientProps) {
   const searchParams = useSearchParams();
-  const windowParam = searchParams.get("window");
+  const windowParam = searchParams?.get("window");
   const windowStr = typeof windowParam === "string" ? windowParam : "30";
   const timeframeDays = ["7", "30", "90"].includes(windowStr) ? windowStr : "30";
 
