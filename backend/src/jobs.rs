@@ -41,9 +41,9 @@ pub struct JobMention {
 pub async fn scrape_hn_hiring_threads(
     client: &Client,
     pool: &PgPool,
-    tracked_repos: &[(Uuid, String)],
+    _tracked_repos: &[(Uuid, String)],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let thread_url = "https://hn.algolia.com/api/v1/search?tags=story,author_whoishiring&query=\"Ask HN: Who is hiring?\"&hitsPerPage=2";
+    let thread_url = "https://hn.algolia.com/api/v1/search_by_date?tags=story,author_whoishiring&query=\"Ask HN: Who is hiring?\"&hitsPerPage=2";
     let thread_resp = client.get(thread_url).send().await?.json::<HNStorySearchResponse>().await?;
 
     let mut raw_inserts = 0;
@@ -66,8 +66,10 @@ pub async fn scrape_hn_hiring_threads(
 
         for comment in comments_resp.hits {
             if let Some(text) = comment.comment_text {
-                let text_lower = text.clone();
-                
+                let text_upper = text.to_uppercase();
+                if text_upper.contains("SEEKING WORK") || text_upper.contains("SEEKING FREELANCER") {
+                    continue;
+                }
                 // Parse company & title from standard HN format
                 let first_line = text.lines().next().unwrap_or("");
                 let chunks: Vec<&str> = first_line.split('|').collect();
@@ -127,6 +129,11 @@ pub async fn scrape_hn_hiring_threads(
 
     // Execute the Alias Engine: PostgreSQL Full-Text Search Tokenization
     // This replaces the in-memory substring ILIKE matching
+    let mut transaction = pool.begin().await?;
+    sqlx::query("TRUNCATE TABLE job_mentions")
+        .execute(&mut *transaction)
+        .await?;
+
     let mapped_count = sqlx::query(
         r#"
         INSERT INTO job_mentions (repo_id, company_name, job_title, source_url, posted_at)
@@ -141,17 +148,21 @@ pub async fn scrape_hn_hiring_threads(
         WHERE 
             EXISTS (
                 SELECT 1 FROM unnest(repo.aliases) AS alias 
-                WHERE to_tsvector('english', raw.content) @@ plainto_tsquery('english', alias)
+                WHERE NOT (LOWER(alias) = ANY($1))
+                  AND to_tsvector('english', raw.content) @@ plainto_tsquery('english', alias)
             )
             AND array_length(repo.aliases, 1) > 0
         ON CONFLICT ON CONSTRAINT unique_job_mention DO NOTHING;
         "#
     )
-    .execute(pool)
+    .bind(crate::alias_engine::UNSAFE_HIRING_ALIASES)
+    .execute(&mut *transaction)
     .await?
     .rows_affected();
 
-    tracing::info!("Alias Engine mapped {} new repository mentions via tsvector tokenization.", mapped_count);
+    transaction.commit().await?;
+
+    tracing::info!("Alias Engine rebuilt {} repository mentions via tsvector tokenization.", mapped_count);
 
     Ok(())
 }

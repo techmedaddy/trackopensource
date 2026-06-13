@@ -1,4 +1,4 @@
-use crate::{categorize::categorize_repo, hacker_news};
+use crate::categorize::categorize_repo;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, LINK, USER_AGENT};
 use serde::Deserialize;
 use std::env;
@@ -195,6 +195,17 @@ pub async fn run(pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> 
                     }
                     Err(e) => {
                         tracing::error!("Failed to fetch HN mentions for {}/{}: {}", owner, name, e);
+                    }
+                }
+
+                match crate::reddit::fetch_reddit_mentions(&client, repo_id, &owner, &name).await {
+                    Ok(mentions) => {
+                        if let Err(e) = crate::hacker_news::save_social_mentions(&pool, mentions).await {
+                            tracing::error!("Failed to save Reddit mentions for {}/{}: {}", owner, name, e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to fetch Reddit mentions for {}/{}: {}", owner, name, e);
                     }
                 }
 

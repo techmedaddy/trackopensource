@@ -29,7 +29,7 @@ pub async fn fetch_hn_mentions(
 ) -> Result<Vec<SocialMention>, Box<dyn std::error::Error>> {
     let query = format!("github.com/{}/{}", owner, name);
     let url = format!(
-        "https://hn.algolia.com/api/v1/search?query={}&restrictSearchableAttributes=url&hitsPerPage=50",
+        "https://hn.algolia.com/api/v1/search?query={}&hitsPerPage=50",
         query
     );
 

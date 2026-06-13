@@ -76,12 +76,10 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
 
     let social_data = sqlx::query!(
         r#"
-        SELECT repo_id, SUM(score) as total_score, SUM(comments_count) as total_comments, COUNT(id) as total_mentions
+        SELECT repo_id as "repo_id!", SUM(score) as total_score, SUM(comments_count) as total_comments, COUNT(id) as total_mentions
         FROM social_mentions
-        WHERE published_at >= (NOW() - make_interval(days := $1))
         GROUP BY repo_id
-        "#,
-        timeframe_days
+        "#
     )
     .fetch_all(pool)
     .await?;
@@ -97,7 +95,7 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
 
     let job_data = sqlx::query!(
         r#"
-        SELECT repo_id, COUNT(id) as total_jobs
+        SELECT repo_id as "repo_id!", COUNT(id) as "total_jobs!"
         FROM job_mentions
         WHERE posted_at >= (NOW() - make_interval(days := $1))
         GROUP BY repo_id
@@ -107,29 +105,9 @@ pub async fn refresh_rankings(pool: &PgPool, timeframe_days: i32) -> Result<usiz
     .fetch_all(pool)
     .await?;
 
-    // Total distinct companies posting in this window (denominator for penetration %)
-    let total_companies: i64 = sqlx::query_scalar!(
-        r#"
-        SELECT COUNT(DISTINCT company_name) as "count!"
-        FROM job_mentions
-        WHERE posted_at >= (NOW() - make_interval(days := $1))
-        "#,
-        timeframe_days
-    )
-    .fetch_one(pool)
-    .await
-    .unwrap_or(0);
-
     let mut job_map: HashMap<Uuid, i64> = HashMap::new();
     for row in job_data {
-        let raw_count = row.total_jobs.unwrap_or(0);
-        // Normalize as penetration percentage: (mentions / total_companies) * 100
-        let penetration = if total_companies > 0 {
-            (raw_count as f64 / total_companies as f64 * 100.0) as i64
-        } else {
-            raw_count
-        };
-        job_map.insert(row.repo_id, penetration);
+        job_map.insert(row.repo_id, row.total_jobs);
     }
 
     let mut current_repo_id: Option<Uuid> = None;
@@ -250,12 +228,13 @@ fn score_rankings(raw_rankings: Vec<RawRanking>) -> Vec<ScoredRanking> {
     raw_rankings
         .into_iter()
         .map(|raw| {
-            let velocity_score = normalize(raw.star_velocity, max_velocity);
-            let growth_score = normalize(raw.growth_ratio, max_growth);
-            let contributor_score = normalize(raw.contributor_growth, max_contributor);
-            let activity_score = normalize(raw.activity_raw, max_activity);
-            let social_score = normalize(raw.social_raw, max_social);
-            let hiring_score = normalize(raw.hiring_raw, max_hiring);
+            // Using log10 normalization because these metrics (social, hiring, stars) follow a power-law distribution.
+            let velocity_score = normalize_log10(raw.star_velocity, max_velocity);
+            let growth_score = normalize_log10(raw.growth_ratio, max_growth);
+            let contributor_score = normalize_log10(raw.contributor_growth, max_contributor);
+            let activity_score = normalize_log10(raw.activity_raw, max_activity);
+            let social_score = normalize_log10(raw.social_raw, max_social);
+            let hiring_score = normalize_log10(raw.hiring_raw, max_hiring);
             
             let trend_score = (velocity_score * 0.30)
                 + (growth_score * 0.15)
@@ -381,7 +360,9 @@ where
         .fold(0.0, f64::max)
 }
 
-fn normalize(value: f64, max_value: f64) -> f64 {
+/// Kept for reference and validation; linear normalization compresses power-law data.
+#[allow(dead_code)]
+fn normalize_linear(value: f64, max_value: f64) -> f64 {
     if max_value <= 0.0 {
         0.0
     } else {
@@ -389,17 +370,35 @@ fn normalize(value: f64, max_value: f64) -> f64 {
     }
 }
 
+/// Normalizes power-law data (like social mentions and star velocity) using a log10 scale.
+///
+/// WHY LOG10 WAS CHOSEN: 
+/// Social and hiring metrics in open source follow a strict Zipfian/Power-Law distribution.
+/// A massive outlier (e.g. React with 5,000 mentions) will crush 95% of other repositories
+/// down to <5.0 on a linear scale, causing severe data compression (the y=0 visual clustering).
+/// Log10 organically distributes this long tail across the 0-100 range, ensuring
+/// that highly-adopted tools aren't mathematically hidden by absolute mega-frameworks.
+fn normalize_log10(value: f64, max_value: f64) -> f64 {
+    if max_value <= 0.0 || value <= 0.0 {
+        return 0.0;
+    }
+    // We add 1.0 to handle 0 values cleanly without mathematical panics
+    (((value + 1.0).log10() / (max_value + 1.0).log10()) * 100.0).clamp(0.0, 100.0)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::normalize;
+    use super::{normalize_linear, normalize_log10};
 
     #[test]
     fn normalize_clamps_negative_values() {
-        assert_eq!(normalize(-5.0, 10.0), 0.0);
+        assert_eq!(normalize_linear(-5.0, 10.0), 0.0);
+        assert_eq!(normalize_log10(-5.0, 10.0), 0.0);
     }
 
     #[test]
     fn normalize_handles_empty_denominator() {
-        assert_eq!(normalize(5.0, 0.0), 0.0);
+        assert_eq!(normalize_linear(5.0, 0.0), 0.0);
+        assert_eq!(normalize_log10(5.0, 0.0), 0.0);
     }
 }
