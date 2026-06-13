@@ -12,8 +12,8 @@
     "@clerk/nextjs": "^7.4.3",
     "mermaid": "^11.15.0",
     "next": "16.2.6",
-    "nextra": "^2.13.0",
-    "nextra-theme-docs": "^2.13.0",
+    "nextra": "^3.0.0",
+    "nextra-theme-docs": "^3.0.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
@@ -31,8 +31,5 @@
     "pg": "^8.21.0",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "overrides": {
-    "@headlessui/react": "1.7.19"
   }
 }
