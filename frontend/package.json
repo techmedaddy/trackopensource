@@ -31,5 +31,8 @@
     "pg": "^8.21.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@headlessui/react": "1.7.19"
   }
 }
