@@ -537,7 +537,7 @@ function EmptyState() {
 
 function CategoryIcon({ cat }: { cat: string }) {
   const getSimpleIcon = (name: string) => (
-    <img src={`https://cdn.jsdelivr.net/npm/simple-icons@13.0.0/icons/${name}.svg`} alt={cat} className="w-3.5 h-3.5 mr-1.5" />
+    <img src={`/icons/${name}`} alt={cat} className="w-3.5 h-3.5 mr-1.5" />
   );
 
   switch (cat) {
