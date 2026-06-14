@@ -51,6 +51,7 @@ pub async fn run(pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> 
 
     let client = reqwest::Client::builder()
         .default_headers(headers)
+        .timeout(std::time::Duration::from_secs(30))
         .build()?;
 
     let mut repos_to_track: Vec<(String, String)> = Vec::new();
@@ -216,8 +217,13 @@ pub async fn run(pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> 
 
     let processed_repos: Vec<(Uuid, String)> = stream.filter_map(|opt| async move { opt }).collect().await;
 
+    tracing::info!("Executing Alias Engine to generate search vectors for {} repositories...", processed_repos.len());
+    if let Err(e) = crate::alias_engine::run_alias_generation(pool).await {
+        tracing::error!("Alias Engine Generation failed: {}", e);
+    }
+
     tracing::info!("Starting Job Collector Cron for {} repositories...", processed_repos.len());
-    if let Err(e) = crate::jobs::scrape_hn_hiring_threads(&client, &pool, processed_repos.as_slice()).await {
+    if let Err(e) = crate::jobs::scrape_hn_hiring_threads(&client, pool, processed_repos.as_slice()).await {
         tracing::error!("Job Collector failed: {}", e);
     }
 

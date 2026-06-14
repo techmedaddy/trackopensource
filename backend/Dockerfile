@@ -12,6 +12,7 @@ RUN cargo build --release --bin backend
 RUN cargo build --release --bin collector
 RUN cargo build --release --bin ranker
 RUN cargo build --release --bin worker
+RUN cargo build --release --bin rebuild
 
 FROM debian:bookworm-slim
 
@@ -28,6 +29,7 @@ COPY --from=builder /usr/src/app/target/release/backend /usr/local/bin/backend
 COPY --from=builder /usr/src/app/target/release/collector /usr/local/bin/collector
 COPY --from=builder /usr/src/app/target/release/ranker /usr/local/bin/ranker
 COPY --from=builder /usr/src/app/target/release/worker /usr/local/bin/worker
+COPY --from=builder /usr/src/app/target/release/rebuild /usr/local/bin/rebuild
 
 # Copy migrations so they can be run on startup if needed
 COPY --from=builder /usr/src/app/migrations ./migrations

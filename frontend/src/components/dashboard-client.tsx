@@ -92,7 +92,7 @@ export function DashboardClient({
   );
 
   const { data: matrixData = [] } = useSWR<RankedRepository[]>(
-    `/api/trending?limit=50&timeframeDays=${timeframeDays}`,
+    `/api/trending?limit=50&timeframeDays=${timeframeDays}&matrix=true`,
     fetcher,
     { fallbackData: initialTrending, keepPreviousData: true, refreshInterval: 60000 }
   );
@@ -537,7 +537,7 @@ function EmptyState() {
 
 function CategoryIcon({ cat }: { cat: string }) {
   const getSimpleIcon = (name: string) => (
-    <img src={`https://cdn.simpleicons.org/${name}`} alt={cat} className="w-3.5 h-3.5 mr-1.5" />
+    <img src={`/icons/${name}`} alt={cat} className="w-3.5 h-3.5 mr-1.5" />
   );
 
   switch (cat) {

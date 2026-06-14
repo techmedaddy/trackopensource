@@ -35,6 +35,7 @@ pub struct RankingQuery {
     pub cw: Option<f64>,
     pub hw: Option<f64>,
     pub sw: Option<f64>,
+    pub matrix: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -462,7 +463,13 @@ async fn fetch_with_timeframe(
 
     match sort_mode {
         SortMode::Trend => {
-            builder.push(" ORDER BY rank.trend_score DESC, rank.star_velocity DESC");
+            if query.matrix.unwrap_or(false) {
+                // For the Matrix, we want to visually scatter across all 4 quadrants.
+                // We blend trend_score and hiring_score to pull a diverse mix of viral spikes AND established bedrocks.
+                builder.push(" ORDER BY (rank.trend_score + rank.hiring_score) DESC, rank.star_velocity DESC");
+            } else {
+                builder.push(" ORDER BY rank.trend_score DESC, rank.star_velocity DESC");
+            }
         }
         SortMode::Fastest => {
             builder.push(" ORDER BY rank.star_velocity DESC, rank.stars_gained DESC");
@@ -485,6 +492,9 @@ async fn fetch_all_time_fallback(
     // so they still sort correctly on the frontend.
     let mut builder = QueryBuilder::new(
         r#"
+        WITH stats AS (
+            SELECT MAX(stars::FLOAT) as max_stars FROM repositories
+        )
         SELECT
             r.id,
             r.github_id,
@@ -506,12 +516,13 @@ async fn fetch_all_time_fallback(
             0.0::FLOAT as contributor_score,
             0.0::FLOAT as activity_score,
             0.0::FLOAT as maintenance_score,
-            (r.stars::FLOAT) as trend_score,
-            0.0::FLOAT as social_score,
-            0.0::FLOAT as hype_score,
-            0.0::FLOAT as hiring_score,
+            LEAST((r.stars::FLOAT / NULLIF(s.max_stars, 0)) * 100.0, 100.0) as trend_score,
+            LEAST((r.stars::FLOAT / NULLIF(s.max_stars, 0)) * 50.0, 100.0) as social_score,
+            LEAST((r.stars::FLOAT / NULLIF(s.max_stars, 0)) * 100.0, 100.0) as hype_score,
+            LEAST((r.stars::FLOAT / NULLIF(s.max_stars, 0)) * 70.0, 100.0) as hiring_score,
             r.updated_at
         FROM repositories r
+        CROSS JOIN stats s
         WHERE r.stars >= 0
         "#
     );

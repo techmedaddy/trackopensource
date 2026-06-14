@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("--- PIPELINE REBUILD COMPLETE ---");
     
     // Output the distribution
-    let scores = sqlx::query("SELECT (velocity_score * 0.5 + social_score * 0.5)::FLOAT as hype_score FROM rankings WHERE social_score > 0 OR velocity_score > 0").fetch_all(&pool).await?;
+    let scores = sqlx::query("SELECT (velocity_score * 0.5 + social_score * 0.5)::FLOAT as hype_score FROM rankings WHERE (social_score > 0 OR velocity_score > 0) AND timeframe_days = 30").fetch_all(&pool).await?;
     let mut buckets = vec![0; 10];
     let mut total_with_score = 0;
     
