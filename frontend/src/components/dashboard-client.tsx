@@ -80,7 +80,7 @@ export function DashboardClient({
   );
 
   const { data: fastestGrowing = [] } = useSWR<RankedRepository[]>(
-    `/api/fastest-growing?limit=14&timeframeDays=${timeframeDays}${categoryParam}`,
+    `/api/fastest-growing?limit=15&timeframeDays=${timeframeDays}${categoryParam}`,
     fetcher,
     { fallbackData: activeCategory ? undefined : initialFastest, keepPreviousData: true, refreshInterval: 60000 }
   );

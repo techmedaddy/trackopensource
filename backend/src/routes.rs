@@ -111,6 +111,7 @@ pub async fn search(
                 cw: None,
                 hw: None,
                 sw: None,
+                matrix: None,
             },
             SortMode::Trend,
         )
