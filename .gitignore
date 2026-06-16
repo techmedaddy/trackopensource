@@ -16,3 +16,7 @@ backend/target/
 
 # OS
 .DS_Store
+
+# Data & Backups
+*.dump
+*.sql.gz
