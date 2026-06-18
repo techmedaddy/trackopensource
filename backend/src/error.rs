@@ -9,6 +9,8 @@ use serde::Serialize;
 pub enum AppError {
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
+    #[error("network error: {0}")]
+    Reqwest(#[from] reqwest::Error),
     #[error("{0}")]
     RateLimit(String),
 }
@@ -26,6 +28,10 @@ impl IntoResponse for AppError {
             }
             AppError::RateLimit(msg) => {
                 (StatusCode::TOO_MANY_REQUESTS, msg.clone())
+            }
+            AppError::Reqwest(e) => {
+                tracing::error!("Internal network error: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "An internal network error occurred".to_string())
             }
             AppError::Database(e) => {
                 // Log the real error server-side but never expose it to the client

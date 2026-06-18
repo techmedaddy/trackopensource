@@ -38,7 +38,7 @@ export function GithubSearchPanel() {
 
       try {
         const response = await fetch(
-          `https://api.github.com/search/repositories?q=${encodeURIComponent(trimmed)}&per_page=6`,
+          `${API_BASE_URL}/github/search?q=${encodeURIComponent(trimmed)}&per_page=6`,
           { signal: controller.signal }
         );
 

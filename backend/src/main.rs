@@ -71,6 +71,7 @@ async fn main() {
         .route("/api/trending", get(routes::trending))
         .route("/api/fastest-growing", get(routes::fastest_growing))
         .route("/api/search", get(routes::search))
+        .route("/api/github/search", get(routes::proxy_github_search))
         .route("/api/repos/:id", get(routes::repo_detail))
         .route("/api/facets", get(routes::facets))
         .route("/api/webhooks/clerk", post(routes::clerk_webhook))

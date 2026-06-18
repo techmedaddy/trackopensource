@@ -48,6 +48,13 @@ pub struct SearchQuery {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GithubSearchQuery {
+    pub q: String,
+    pub per_page: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepoDetailQuery {
     pub timeframe_days: Option<i32>,
 }
@@ -825,3 +832,30 @@ pub async fn revoke_api_key(
     Ok(StatusCode::OK)
 }
 
+pub async fn proxy_github_search(
+    Query(query): Query<GithubSearchQuery>,
+) -> AppResult<axum::response::Response> {
+    let token = std::env::var("GITHUB_TOKEN").unwrap_or_default();
+    let per_page = query.per_page.unwrap_or(6);
+    
+    let client = reqwest::Client::new();
+    let req = client
+        .get("https://api.github.com/search/repositories")
+        .query(&[("q", &query.q), ("per_page", &per_page.to_string())])
+        .header("User-Agent", "trackopensource")
+        .header("Accept", "application/vnd.github.v3+json");
+
+    let req = if !token.is_empty() {
+        req.header("Authorization", format!("Bearer {}", token))
+    } else {
+        req
+    };
+
+    let res = req.send().await?;
+    let bytes = res.bytes().await?;
+    
+    Ok(axum::response::Response::builder()
+        .header("Content-Type", "application/json")
+        .body(axum::body::Body::from(bytes))
+        .unwrap())
+}
