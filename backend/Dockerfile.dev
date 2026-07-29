@@ -3,11 +3,12 @@
 FROM rust:slim AS tooling
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev \
+    curl pkg-config libssl-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN cargo install cargo-watch --locked \
-    && cargo install sqlx-cli --no-default-features --features rustls,postgres --locked
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
+    && cargo binstall -y cargo-watch \
+    && cargo binstall -y sqlx-cli
 
 # ── Stage 2: Dev Runtime ──────────────────────────────────────
 # Slim image with only the pre-built tools copied in
